@@ -8,7 +8,7 @@ export type AppShellProps = {
   title: string;
   version: string;
   onLogout: () => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 };
 
 export function AppShell({ title, version, onLogout, children }: AppShellProps) {
