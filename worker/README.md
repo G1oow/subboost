@@ -32,6 +32,12 @@ npm run test:unit -- worker
 npm run lint
 ```
 
+### 本地开发注意事项
+
+- **本地无法验证重定向相关的 SSRF 逐跳校验。** `wrangler dev` 本地模式的出站 `fetch` 会自动跟随 3xx 重定向，`redirect: "manual"` 不生效，Worker 代码看不到 302，因此 `safe-fetch.ts` 的逐跳校验与「最多 3 跳」限制在本地不会触发（指向私网的重定向会表现为运行时网络错误，而不是「目标地址不允许」）。生产 Workers 运行时按官方文档会把 3xx 响应原样返回给调用方，部署后请按下文「部署后复核」验证。
+- **Windows 上重新构建时 `dist` 可能残留旧 `assets/*`。** 当有进程（如正在运行的 `wrangler dev`、预览工具或杀毒扫描）持有这些文件的句柄时，Node 与 Vite 的删除会被推迟（`emptyOutDir` 看似未生效，文件仍在目录中可见）。遇到残留时先停止相关进程并手动删除 `worker/dist` 再构建；部署前确认 `dist/index.html` 引用的 `assets/*` 与目录内容一致。
+- 若本机设置了 `http_proxy` / `https_proxy` 环境变量，`wrangler dev` 会让 Worker 的出站请求经过该代理。
+
 ## 首次部署
 
 ```bash
@@ -52,6 +58,8 @@ curl -s $B/api/health                                  # {"ok":true}
 curl -s -o /dev/null -w "%{http_code}\n" $B/api/state  # 401
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" $B/api/state
 ```
+
+部署后还应复核本地无法验证的重定向逐跳校验：添加一个 `remote` 源 `https://httpbin.org/redirect/5`，手动刷新后该源应失败且错误为「重定向次数超过上限」；若错误是节点解析失败，说明运行时自动跟随了重定向，逐跳校验未生效。
 
 ## 说明
 
