@@ -45,6 +45,20 @@ export async function computeConfigHash(config: Record<string, unknown>): Promis
   return sha256Hex(stableJsonStringify(config));
 }
 
+/**
+ * 生成前规范化配置：`dnsYaml` 为空白字符串时视为未提供。
+ * 生成器把任何字符串类型的 `dnsYaml` 都当作显式基础配置并跳过默认 general 段，
+ * 而 `buildDefaultUserConfig` 的默认值恰好是空串，直接透传会丢失 mixed-port/dns 等默认段。
+ */
+export function normalizeConfigForGeneration(config: Record<string, unknown>): Record<string, unknown> {
+  if (typeof config.dnsYaml === "string" && config.dnsYaml.trim() === "") {
+    const rest = { ...config };
+    delete rest.dnsYaml;
+    return rest;
+  }
+  return config;
+}
+
 async function runWithConcurrency<T, R>(
   limit: number,
   items: T[],
@@ -160,7 +174,7 @@ export async function generateSubscription(
   if (nodes.length === 0) return { kind: "no-nodes" };
 
   const { config } = await store.getConfig();
-  const options = buildGenerateOptionsFromConfig(config, { nodes });
+  const options = buildGenerateOptionsFromConfig(normalizeConfigForGeneration(config), { nodes });
   const yaml = generateClashYaml(options);
   const info = aggregateUserInfo(targets, snapshots);
 

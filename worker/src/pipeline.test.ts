@@ -4,6 +4,7 @@ import {
   computeConfigHash,
   generateSubscription,
   getOrGenerateSubscription,
+  normalizeConfigForGeneration,
   refreshAll,
   type PipelineDeps,
 } from "./pipeline";
@@ -341,3 +342,63 @@ describe("refreshAll", () => {
   });
 });
 
+
+describe("normalizeConfigForGeneration", () => {
+  it("drops a blank dnsYaml and keeps everything else", () => {
+    expect(normalizeConfigForGeneration({ dnsYaml: "", mixedPort: 1 })).toEqual({ mixedPort: 1 });
+    expect(normalizeConfigForGeneration({ dnsYaml: "  \n", mixedPort: 1 })).toEqual({ mixedPort: 1 });
+  });
+
+  it("keeps an explicit base config yaml and configs without dnsYaml untouched", () => {
+    const explicit = { dnsYaml: "mixed-port: 1234\n", mixedPort: 1 };
+    expect(normalizeConfigForGeneration(explicit)).toBe(explicit);
+    const plain = { mixedPort: 1 };
+    expect(normalizeConfigForGeneration(plain)).toBe(plain);
+  });
+});
+
+describe("default config base sections", () => {
+  let h: Harness;
+
+  beforeEach(async () => {
+    h = await createHarness();
+    await h.store.saveSources([{ name: "m", kind: "manual", manualText: ssNode("m", 8388) }]);
+  });
+
+  it("emits the default general section although the stored default config carries an empty dnsYaml", async () => {
+    const { token } = await h.store.createSubscription({ name: "s", sourceIds: [] });
+    const { config } = await h.store.getConfig();
+    expect(config.dnsYaml).toBe("");
+
+    const result = await getOrGenerateSubscription(h.deps, token);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    const parsed = yaml.load(result.cache.yaml) as Record<string, unknown>;
+    expect(parsed["mixed-port"]).toBe(7897);
+    expect(parsed.dns).toBeDefined();
+  });
+
+  it("applies mixedPort edits made on the full default config", async () => {
+    const { token } = await h.store.createSubscription({ name: "s", sourceIds: [] });
+    const { config } = await h.store.getConfig();
+    await h.store.putConfig({ ...config, mixedPort: 45678 });
+
+    const result = await getOrGenerateSubscription(h.deps, token);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    const parsed = yaml.load(result.cache.yaml) as Record<string, unknown>;
+    expect(parsed["mixed-port"]).toBe(45678);
+  });
+
+  it("lets a non-empty dnsYaml override the default base sections", async () => {
+    const { token } = await h.store.createSubscription({ name: "s", sourceIds: [] });
+    const { config } = await h.store.getConfig();
+    await h.store.putConfig({ ...config, dnsYaml: "mixed-port: 1234\n" });
+
+    const result = await getOrGenerateSubscription(h.deps, token);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    const parsed = yaml.load(result.cache.yaml) as Record<string, unknown>;
+    expect(parsed["mixed-port"]).toBe(1234);
+  });
+});
