@@ -90,6 +90,11 @@ git stash list
 | 2026-10-12 | `wrangler dev --test-scheduled` 的 `/__scheduled` 被 Static Assets 层先行接管，中间件不生效（Plan U8） | Cron 冒烟失败 | `worker/wrangler.jsonc` 的 `run_worker_first` 追加 `/__scheduled`；冒烟第 9/10 步通过，`meta:status.lastTrigger` 为 `cron` |
 | 2026-10-12 | 本机 8787 端口被占用（bind 权限错误） | 冒烟无法在默认端口运行 | 改用 `--port 8899 --ip 127.0.0.1` 完成冒烟；不涉及代码变更 |
 | 2026-10-12 | 计划中 `eslint.config.mjs` 仅允许 U4 触发时做 `@next/next/*` 作用域覆盖；实际 `eslint worker` 会扫描 `worker/dist`、`worker/.wrangler` 构建产物并报 16 个 error | 根 `npm run lint` 失败 | 在 `globalIgnores` 追加 `worker/dist/**`、`worker/.wrangler/**` 两行；未改动任何规则语义，`@next/next/*` 未对 `worker/**` 源码误报 |
+| 2026-10-12 | 验收复核：`worker/ui/src/components/render.test.ts` 用 `createElement(AppShell, props, child)` 传 children，但 `AppShellProps.children` 为必填，UI 类型检查失败（交付时 `npm run worker:typecheck` 实际未通过） | 验收顺序第 2 步失败 | `children` 改为可选（与 `FormField` 等既有组件惯例一致），typecheck 通过 |
+| 2026-10-12 | 验收复核：`buildDefaultUserConfig("standard")` 的 `dnsYaml` 为空串，生成器把任何字符串类型的 `dnsYaml` 视为显式基础配置并跳过默认 general 段，默认配置生成的 YAML 缺少 `mixed-port`/`dns` 等基础段，`PUT /api/config` 修改 `mixedPort` 不生效（AC7 实际未达成；原单测只用了不含 `dnsYaml` 的配置，未覆盖该路径） | 订阅输出质量下降，配置编辑失效 | `worker/src/pipeline.ts` 新增 `normalizeConfigForGeneration`（空白 `dnsYaml` 视为未提供，显式 YAML 保留覆盖语义）；新增 5 条回归测试；冒烟复核默认 `mixed-port: 7897` → 改 45678 生效 → 恢复默认回 7897 |
+| 2026-10-12 | 验收复核：`wrangler dev` 本地模式出站 fetch 自动跟随 3xx（`redirect: "manual"` 不生效），`safe-fetch.ts` 的逐跳 SSRF 校验与 3 跳上限在本地不会触发；原冒烟中「长度 59」的错误实为 workerd 运行时网络错误，并非应用层拦截（Cloudflare 官方文档确认生产 Workers 将 3xx 原样返回给调用方） | AC9 的重定向部分本地无法验证 | 逐跳校验由 `safe-fetch.test.ts` 覆盖；`worker/README.md` 登记注意事项与部署后复核步骤（`httpbin.org/redirect/5` 源应报「重定向次数超过上限」） |
+| 2026-10-12 | 验收复核：Static Assets 将 `/index.html` 307 到 `/`，`_headers` 中 `/index.html` 的 `Cache-Control: no-store` 规则不会命中真实页面（`/` 实际返回 `public, max-age=0, must-revalidate`） | 管理页 HTML 未按预期 no-store | 规则路径改为 `/` |
+| 2026-10-12 | 验收复核：Windows 上重建时 `dist` 残留旧 `assets/*`（有进程持有文件句柄时 Node/Vite 的删除被推迟，`emptyOutDir` 看似未生效；Git Bash 的 `rm` 可正常删除） | 部署可能带上无引用的旧产物 | 本地环境现象，无代码改动；`worker/README.md` 登记处理方式（先停相关进程并手动清理 `dist` 再构建） |
 
 ---
 
@@ -831,14 +836,26 @@ npm run worker:deploy
 - [x] AC4 配置保存与重置（F4）：`router.test.ts`
 - [x] AC5 部分失败与保护性快照（F5）：`pipeline.test.ts`
 - [x] AC6 订阅输出与响应头（F6）：冒烟第 6、7 步；`router.test.ts`
-- [x] AC7 配置变更后自动重生成（F6）：`pipeline.test.ts`
+- [x] AC7 配置变更后自动重生成（F6）：`pipeline.test.ts`；验收复核发现默认配置因空 `dnsYaml` 丢失基础段且改 `mixedPort` 不生效，已修复并在 `wrangler dev` 下复核 7897 → 45678 → 7897（见 1.7）
 - [x] AC8 健康检查（F7）：冒烟第 1 步
-- [x] AC9 SSRF 规则与重定向（F8）：`ssrf.test.ts`、`safe-fetch.test.ts`
+- [x] AC9 SSRF 规则与重定向（F8）：`ssrf.test.ts`、`safe-fetch.test.ts`；重定向逐跳校验仅由单测覆盖，本地 `wrangler dev` 自动跟随重定向无法复现应用层拦截，需部署后复核（见 1.7）
 - [x] AC10 Cron 触发（F9）：冒烟第 9 步
 - [x] AC11 工程接入与无越界改动（S4）：验证顺序第 2、3、5 步
 - [x] AC12 管理页主题与令牌合规（D4）：Task 3.3 完成条件；`check-ui-consistency` 无告警
 
 交付标准：以上 12 项全部勾选，且 1.7 冲突记录中没有未处理项。
+
+### 验收复核记录（2026-10-12，独立复核）
+
+复核环境：Windows 11 本机，`wrangler dev --test-scheduled`（本地模式，端口 8899，独立 KV 状态目录），外部依赖 httpbin.org。
+
+1. `npm run test:unit -- worker`：13 文件 / 153 用例通过；修复后 pipeline 套件 20/20（含 5 条新增回归用例）。
+2. `npm run worker:typecheck`、`npm run lint`（含 `check:ui-consistency`，353 文件）：通过（typecheck 为修复后）。
+3. 全量 `npm run test:unit`：259 文件 / 1838 用例通过，唯一失败为基线既有 `local/scripts/selfhost-lifecycle-shell.test.ts` 超时（环境相关）；`npm run test:coverage` 与 `npm run check:local-app` 在 CI（Linux）通过。
+4. 第 5.3 节冒烟序列逐步通过；额外复核：401/503 鉴权、50 源上限、43 字符 token、KV 密文（`payloadEnc`/`tokenEnc` 均为 `v1:` 开头，明文 token 与 `ss://` 文本在 KV 文件中出现 0 次）、跨源去重（3 行含重复 → `proxies=2`）、部分失败源仍生成订阅、轮换后旧链接 404、删除 204 + 再次删除 404、Cron 触发后 `lastTrigger=cron`、未知 token 纯文本 `Not found`、`/api/*` 全部带 `no-store`。
+5. `git status --porcelain` 不含 `local/`、`packages/`。
+6. 未能在本地验证：重定向逐跳 SSRF 校验（见 1.7，部署后按 README 复核）；AC12 的真实浏览器交互（本会话浏览器工具不可用，采用静态核验：构建产物含 light/dark 主题变量与主题初始化脚本、页面源码无密钥值、`check-ui-consistency` 无告警）。
+
 
 
 
