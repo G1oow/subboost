@@ -14,6 +14,11 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # CodeQL 的 SARIF 结果上传需要仓库启用 Code Scanning：
+    # - 公开仓库免费自带，直接运行；
+    # - 私有仓库需要 GitHub Advanced Security（付费），默认跳过以免 CI 误报失败；
+    #   若私有仓库已启用 GHAS，可设置仓库变量 CODEQL_ENABLED=true 恢复运行。
+    if: github.event.repository.visibility == 'public' || vars.CODEQL_ENABLED == 'true'
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
     permissions:
       security-events: write
