@@ -17,7 +17,6 @@ export default mergeConfig(
         provider: "v8",
         include: [
           "packages/**/*.{ts,tsx,js,cjs,mjs}",
-          "local/**/*.{ts,tsx,js,cjs,mjs}",
           "scripts/**/*.{ts,tsx,js,cjs,mjs}",
         ],
         exclude: [

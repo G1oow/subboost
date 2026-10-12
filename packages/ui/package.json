@@ -31,5 +31,8 @@
     "react-remove-scroll-bar": "^2.3.8",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.3.0"
   }
 }

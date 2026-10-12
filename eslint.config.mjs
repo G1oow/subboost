@@ -27,11 +27,6 @@ export default defineConfig([
     linterOptions: {
       reportUnusedDisableDirectives: "off",
     },
-    settings: {
-      next: {
-        rootDir: ["local/"],
-      },
-    },
     rules: {
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
@@ -49,13 +44,9 @@ export default defineConfig([
     },
   },
   globalIgnores([
-    ".next/**",
     "dist/**",
     "worker/dist/**",
     "worker/.wrangler/**",
-    "local/.next/**",
-    "local/next-env.d.ts",
-    "local/src/generated/**",
     "node_modules/**",
   ]),
 ]);

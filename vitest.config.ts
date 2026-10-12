@@ -30,7 +30,6 @@ export default defineConfig({
       "packages/core/src/**/*.test.ts",
       "packages/server-core/src/**/*.test.ts",
       "packages/ui/src/**/*.test.ts",
-      "local/**/*.test.ts",
       "test/regression/tooling/**/*.test.ts",
       "worker/src/**/*.test.ts",
       "worker/ui/src/**/*.test.ts",
@@ -39,8 +38,6 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "local/src"),
-      "@local": path.resolve(__dirname, "local/src"),
       "@subboost/core": path.resolve(__dirname, "packages/core/src"),
       "@subboost/server-core": path.resolve(__dirname, "packages/server-core/src"),
       "@subboost/ui": path.resolve(__dirname, "packages/ui/src"),
