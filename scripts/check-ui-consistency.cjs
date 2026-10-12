@@ -16,7 +16,7 @@ for (let index = 0; index < cliArgs.length; index += 1) {
     requestedRoots.push(cliArgs[index]);
   }
 }
-const roots = (requestedRoots.length > 0 ? requestedRoots : ["packages", "local"])
+const roots = (requestedRoots.length > 0 ? requestedRoots : ["packages", "worker"])
   .map((entry) => path.resolve(workspaceRoot, entry))
   .filter((entry) => fs.existsSync(entry));
 

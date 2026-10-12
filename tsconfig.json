@@ -12,13 +12,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
-      "@/*": ["./local/src/*"],
       "@subboost/core": ["./packages/core/src/index.ts"],
       "@subboost/core/*": ["./packages/core/src/*"],
       "@subboost/server-core": ["./packages/server-core/src/index.ts"],
@@ -29,6 +23,6 @@
     },
     "target": "ES2017"
   },
-  "include": ["local/**/*.ts", "local/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "local/.next", "local/src/generated"]
+  "include": ["packages/**/*.ts", "packages/**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
 }

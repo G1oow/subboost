@@ -59,7 +59,7 @@ describe("public UI consistency checker", () => {
     writeSource("packages/components/ignored.test.tsx", `export const Ignored = () => <IconButton />;`);
     writeSource("packages/__tests__/ignored.tsx", `export const Ignored = () => <Switch />;`);
     writeSource("packages/node_modules/pkg/ignored.tsx", `export const Ignored = () => <Switch />;`);
-    writeSource("local/components/good.tsx", `export const LocalGood = () => <a href="/">text</a>;`);
+    writeSource("worker/components/good.tsx", `export const WorkerGood = () => <a href="/">text</a>;`);
 
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     runCheck();

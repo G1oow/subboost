@@ -1,85 +1,84 @@
 <!-- markdownlint-disable MD033 MD041 -->
 <div align="center">
-  <p><img src="docs/assets/logo.png" alt="SubBoost" width="96"></p>
-  <h1>SubBoost</h1>
+  <p><img src="docs/assets/logo.png" alt="SubBoost Worker Lite" width="96"></p>
+  <h1>SubBoost Worker Lite</h1>
+  <p>Cloudflare Workers + Workers KV 上的 Clash/Mihomo 订阅聚合与管理</p>
   <p>
-    <img src="https://img.shields.io/badge/platform-Linux%20%2B%20Docker-lightgrey.svg" alt="Platform: Linux + Docker">
-    <img src="https://img.shields.io/badge/version-2.9.0-green.svg" alt="Version 2.9.0">
-    <a href="https://subboost.org"><img src="https://img.shields.io/badge/app-subboost.org-brightgreen.svg" alt="Online app"></a>
-    <a href="https://docs.subboost.org"><img src="https://img.shields.io/badge/docs-subboost.org-blue.svg" alt="Documentation"></a>
-    <img src="https://img.shields.io/badge/image-GHCR-blue.svg" alt="GHCR image">
+    <img src="https://img.shields.io/badge/platform-Cloudflare%20Workers%20%2B%20KV-orange.svg" alt="Platform: Cloudflare Workers + KV">
+    <img src="https://img.shields.io/badge/version-0.1.0-green.svg" alt="Version 0.1.0">
+    <img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg" alt="License AGPL-3.0-only">
   </p>
-  <p><strong><a href="README.md">English</a> | <a href="README-CN.md">中文</a></strong></p>
 </div>
 <!-- markdownlint-enable MD033 MD041 -->
 
-**SubBoost** is a **Clash/Mihomo subscription conversion, enhancement, and management** tool. It can convert airport subscriptions and self-hosted nodes into optimized aggregate subscriptions, then update them automatically. With the visual UI, you can configure advanced features such as **chained proxies, precise routing, DNS leak prevention, and multi-subscription aggregation** in one click.
+**SubBoost Worker Lite** 是 [SubBoost](https://github.com/SubBoost/subboost) 的精简部署形态：把几个上游订阅与手动节点聚合成一条 Clash/Mihomo 订阅链接，只依赖 Cloudflare Workers 与 Workers KV，不需要服务器、数据库或容器。适合个人使用、只想维护一条聚合链接的场景。
 
-## Highlights & Use Cases
+## 特性
 
-- **Subscription conversion**: Import subscription links, YAML files, node links, and other common formats.
-- **Node management**: Rename, delete, or configure listening ports for nodes in batches.
-- **Node filtering**: Build `filtered proxy groups` with only selected nodes by source, region, and custom rules.
-- **Chained proxies**: Configure chained proxies and `relay proxy groups` visually in one click.
-- **Precise routing**: Enable more than 30 common proxy groups and over 2,000 remote rule sets.
-- **Rule management**: Reorder rules for deeper customization by advanced users.
-- **DNS leak prevention**: The default `basic and DNS configuration` helps prevent DNS leaks.
-- **Automatic refresh**: Refresh subscriptions on a schedule and intelligently match nodes during refresh.
+- **订阅聚合**：导入多个上游订阅与手动节点（`ss://`、`vmess://`、`vless://`、`trojan://`、`hysteria2://` 等常见协议），跨源去重后生成一条订阅链接
+- **管理端**：token 门保护的 SPA（源管理、订阅管理、刷新状态、生成配置 JSON 编辑），浅色/深色主题
+- **自动刷新**：Cron 每 12 小时抓取上游并预生成缓存，正常访问直接命中缓存
+- **静态加密**：订阅 token 等敏感数据以 AES-256-GCM 静态加密存入 KV（HKDF-SHA256 派生密钥）
+- **SSRF 防护**：协议/凭据校验、私网网段黑名单、重定向逐跳校验（最多 3 跳）
+- **防泄漏**：全响应 `no-store`，错误与状态脱敏，订阅 token 可随时轮换
 
-## Interface Preview
+## 仓库结构
 
-<p align="center">
-  <img src="docs/assets/screenshot-main.png" alt="SubBoost visual configuration interface" width="960">
-</p>
+```
+worker/       Cloudflare Worker（后端 API + 管理端 SPA + 部署配置）
+packages/     共享包：core（解析/生成）、server-core（订阅/加密/SSRF）、ui（组件与主题）、config（tsconfig 等）
+docs/         实施文档（Plan/Build）与贡献指南
+test/         回归测试与测试基础设施
+```
 
-## Usage & Deployment
+## 快速开始
 
-- Online entry: [No deployment required - direct access to the public service](https://subboost.org)
-- Deployment docs: [One-click deployment - pulls an image to build, faster with lower requirements](https://docs.subboost.org/deploy/one-click)
-- Deployment docs: [Advanced deployment - compiles from source, slower with higher requirements](https://docs.subboost.org/deploy/advanced)
-- Configuration guide: [Clash configuration simple enough for a paramecium: configure precise routing and chained proxies from the UI in one click](https://ryanvan.com/t/topic/59?u=ryan)
-
-## Development Notes
-
-Developers can start a local development environment from source:
+前置：Node 22.13+（或 24+）与 npm，本地运行不需要 Cloudflare 账号。
 
 ```bash
 npm ci
-npm run dev
+
+# 1. 准备本地密钥（不要提交）
+cp worker/.dev.vars.example worker/.dev.vars   # 填入随机 ADMIN_TOKEN、ENCRYPTION_KEY
+
+# 2. 构建管理页
+npm run worker:build
+
+# 3. 启动（默认 http://127.0.0.1:8787）
+npm run worker:dev
 ```
 
-Common checks:
+部署到 Cloudflare（创建 KV namespace、设置 secret、`wrangler deploy` 与部署后验证）见 **[worker/README.md](worker/README.md)**。
+
+## 常用命令
 
 ```bash
-npm run lint
-npm run test:unit
-npm run check:local-app
+npm run worker:dev          # 本地运行 Worker
+npm run worker:build        # 构建管理页到 worker/dist
+npm run worker:deploy       # 构建并部署到 Cloudflare
+npm run worker:typecheck    # 类型检查
+npm run lint                # ESLint + UI 一致性检查
+npm run test:unit           # 全量单元/回归测试
+npm run test:coverage       # 带覆盖率阈值的质量门
 ```
 
-## Links
+## 文档
 
-- Online entry: [https://subboost.org](https://subboost.org)
-- Deployment docs: [https://docs.subboost.org](https://docs.subboost.org)
-- Release announcements: [docs/release-notes.md](./docs/release-notes.md)
-- Changelog: [https://subboost.org/faq](https://subboost.org/faq)
-- Community feedback: [LINUX DO](https://linux.do/) & [IDC Flare](https://idcflare.com/); thanks to everyone in the forums for the active discussion and feedback.
+- 部署与运维手册：[worker/README.md](worker/README.md)
+- 实施方案（Plan）：[docs/implementation/cf-worker-lite-plan.md](docs/implementation/cf-worker-lite-plan.md)
+- 构建手册（Build，含冲突与验收记录）：[docs/implementation/cf-worker-lite-build.md](docs/implementation/cf-worker-lite-build.md)
+- 贡献指南：[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
 
-## Star History
+## 与上游 SubBoost 的关系
 
-<a href="https://www.star-history.com/?repos=subboost%2Fsubboost&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=subboost/subboost&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=subboost/subboost&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=subboost/subboost&type=date&legend=top-left" />
- </picture>
-</a>
+本仓库派生自 [SubBoost/subboost](https://github.com/SubBoost/subboost)，只保留 Cloudflare Workers 精简形态所需的代码与测试；上游的 Next.js + PostgreSQL 自托管形态（`local/`）、Docker 发布管线等不在本仓库范围内。共享包（`packages/`）沿用上游实现。
 
-## License
+## 许可证
 
-The public SubBoost source code is licensed under the [GNU Affero General Public License v3.0 only](./LICENSE).
+[GNU Affero General Public License v3.0 only](./LICENSE)。
 
-If you modify SubBoost and provide it to users over a network, AGPL-3.0 requires you to offer those users the corresponding source code. The public source entry is [SubBoost/subboost](https://github.com/SubBoost/subboost).
+如果你修改本仓库并向网络用户提供服务，AGPL-3.0 要求你向这些用户提供对应的源代码。
 
-## Disclaimer
+## 免责声明
 
-This project does not provide any proxy service and makes no guarantee about the availability or legality of third-party subscription content.
+本项目不提供任何代理服务，不对第三方订阅内容的可用性与合法性作任何保证。

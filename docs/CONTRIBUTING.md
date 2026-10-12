@@ -12,7 +12,7 @@ Thanks for helping improve SubBoost.
 
 ## What Belongs Here
 
-This repository contains the deployable app, shared packages, public documentation, tests, and public release automation.
+This repository contains the Cloudflare Worker deployment form of SubBoost (`worker/`), its shared packages, tests, and implementation documentation.
 
 Do not add secrets, personal configuration, deployment credentials, private keys, real subscription URLs, machine-specific files, or private operational notes.
 
@@ -29,7 +29,7 @@ Run the smallest relevant checks first:
 ```powershell
 npm run lint
 npm run test:unit
-npm run check:local-app
+npm run worker:typecheck
 ```
 
 For parser, template, subscription output, or deployment changes, also run the focused test or selftest that covers the changed behavior.
@@ -40,6 +40,6 @@ The app has a dark and a light theme with the same layout. Take colors from the 
 
 ## Documentation
 
-- Keep README changes bilingual: update `README-CN.md` first, then sync `README.md`.
-- Keep deployment instructions in the documentation site unless the README only needs a short pointer.
+- Keep `README.md` (Chinese, single file) in sync with the actual repo layout and commands.
+- Keep detailed deployment instructions in `worker/README.md`; the root README only keeps a short pointer.
 - Avoid publishing maintainer-only workflow, private infrastructure details, or machine-specific paths.
