@@ -32,8 +32,6 @@ export default defineConfig({
       "packages/ui/src/**/*.test.ts",
       "local/**/*.test.ts",
       "test/regression/tooling/**/*.test.ts",
-      "worker/src/**/*.test.ts",
-      "worker/ui/src/**/*.test.ts",
     ],
     restoreMocks: true,
   },

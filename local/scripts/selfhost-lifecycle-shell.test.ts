@@ -79,7 +79,7 @@ ENV
 }
 
 describe("self-host update rollback lifecycle", () => {
-  it("restores the verified dump and old image after candidate health failure", { timeout: 60_000 }, () => {
+  it("restores the verified dump and old image after candidate health failure", () => {
     const result = runRollbackScenario(false);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Candidate update failed: candidate health check failed");
@@ -89,7 +89,7 @@ describe("self-host update rollback lifecycle", () => {
     expect(result.stdout).toContain("Previous version restored successfully.");
   });
 
-  it("keeps writers stopped and preserves the dump when database restore fails", { timeout: 60_000 }, () => {
+  it("keeps writers stopped and preserves the dump when database restore fails", () => {
     const result = runRollbackScenario(true);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Automatic rollback stopped: database restore failed");
@@ -98,7 +98,7 @@ describe("self-host update rollback lifecycle", () => {
     expect(result.stdout).not.toMatch(/old-compose\.yml.* up -d app/);
   });
 
-  it("never deletes a volume that existed before a failed installation", { timeout: 60_000 }, () => {
+  it("never deletes a volume that existed before a failed installation", () => {
     const result = spawnSync("bash", ["-lc", "exec \"$BASH\" -s"], {
       cwd: publicRoot,
       encoding: "utf8",
