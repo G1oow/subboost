@@ -95,6 +95,8 @@ git stash list
 | 2026-10-12 | 验收复核：`wrangler dev` 本地模式出站 fetch 自动跟随 3xx（`redirect: "manual"` 不生效），`safe-fetch.ts` 的逐跳 SSRF 校验与 3 跳上限在本地不会触发；原冒烟中「长度 59」的错误实为 workerd 运行时网络错误，并非应用层拦截（Cloudflare 官方文档确认生产 Workers 将 3xx 原样返回给调用方） | AC9 的重定向部分本地无法验证 | 逐跳校验由 `safe-fetch.test.ts` 覆盖；`worker/README.md` 登记注意事项与部署后复核步骤（`httpbin.org/redirect/5` 源应报「重定向次数超过上限」） |
 | 2026-10-12 | 验收复核：Static Assets 将 `/index.html` 307 到 `/`，`_headers` 中 `/index.html` 的 `Cache-Control: no-store` 规则不会命中真实页面（`/` 实际返回 `public, max-age=0, must-revalidate`） | 管理页 HTML 未按预期 no-store | 规则路径改为 `/` |
 | 2026-10-12 | 验收复核：Windows 上重建时 `dist` 残留旧 `assets/*`（有进程持有文件句柄时 Node/Vite 的删除被推迟，`emptyOutDir` 看似未生效；Git Bash 的 `rm` 可正常删除） | 部署可能带上无引用的旧产物 | 本地环境现象，无代码改动；`worker/README.md` 登记处理方式（先停相关进程并手动清理 `dist` 再构建） |
+| 2026-10-12 | 二次复核：本机 Git for Windows 安装在自定义路径 `D:\Git`，`test/setup-runtime.ts` 的 `findGitBashBin` 只检查 Program Files / LOCALAPPDATA / scoop 默认位置，找不到时直接抛错（PR 未解决问题「本机全量单测基线失败」在本环境的实际根因之一，此前表现为该文件超时/报「Git for Windows Bash is required」） | Windows 本机 shell 脚本套件无法运行 | `findGitBashBin` 追加兜底：用 `where.exe git` 定位 `git.exe` 并向上最多 3 级推导 `<git-root>\bin\bash.exe`；兜底仅在 win32 且默认位置未命中时生效，CI（Linux）不受影响 |
+| 2026-10-12 | 二次复核：Git Bash 检测修复后，全量套件满载并行时该文件 rollback 用例仍超 vitest 默认 5s 单测超时（`spawnSync` 的 30s 尚未到期，测试先被 vitest 终止；单文件运行 7.4s 全过，仅并行满载下触发） | Windows 本机全量单测 1842/1844（2 个 rollback 用例超时） | `local/scripts/selfhost-lifecycle-shell.test.ts` 中三个 spawn bash 的用例加显式 `{ timeout: 60_000 }`（覆盖 `spawnSync` 30s 上限）；修复后全量 260 文件 / 1844 用例全绿（复核时 `wrangler dev` 保持运行，维持满载条件） |
 
 ---
 
@@ -841,7 +843,7 @@ npm run worker:deploy
 - [x] AC9 SSRF 规则与重定向（F8）：`ssrf.test.ts`、`safe-fetch.test.ts`；重定向逐跳校验仅由单测覆盖，本地 `wrangler dev` 自动跟随重定向无法复现应用层拦截，需部署后复核（见 1.7）
 - [x] AC10 Cron 触发（F9）：冒烟第 9 步
 - [x] AC11 工程接入与无越界改动（S4）：验证顺序第 2、3、5 步
-- [x] AC12 管理页主题与令牌合规（D4）：Task 3.3 完成条件；`check-ui-consistency` 无告警
+- [x] AC12 管理页主题与令牌合规（D4）：Task 3.3 完成条件；`check-ui-consistency` 无告警；真实浏览器交互复核已补齐，见「验收复核记录（2026-10-12，第二次复核）」
 
 交付标准：以上 12 项全部勾选，且 1.7 冲突记录中没有未处理项。
 
@@ -855,6 +857,26 @@ npm run worker:deploy
 4. 第 5.3 节冒烟序列逐步通过；额外复核：401/503 鉴权、50 源上限、43 字符 token、KV 密文（`payloadEnc`/`tokenEnc` 均为 `v1:` 开头，明文 token 与 `ss://` 文本在 KV 文件中出现 0 次）、跨源去重（3 行含重复 → `proxies=2`）、部分失败源仍生成订阅、轮换后旧链接 404、删除 204 + 再次删除 404、Cron 触发后 `lastTrigger=cron`、未知 token 纯文本 `Not found`、`/api/*` 全部带 `no-store`。
 5. `git status --porcelain` 不含 `local/`、`packages/`。
 6. 未能在本地验证：重定向逐跳 SSRF 校验（见 1.7，部署后按 README 复核）；AC12 的真实浏览器交互（本会话浏览器工具不可用，采用静态核验：构建产物含 light/dark 主题变量与主题初始化脚本、页面源码无密钥值、`check-ui-consistency` 无告警）。
+
+### 验收复核记录（2026-10-12，第二次复核：处理 PR 未解决问题）
+
+复核环境：Windows 11 本机，`wrangler dev`（本地模式，端口 8787，`worker/.dev.vars` 提供 `ADMIN_TOKEN`/`ENCRYPTION_KEY`），Chrome DevTools 浏览器自动化；全量测试复核期间 `wrangler dev` 保持运行以维持满载条件。
+
+针对 PR「未解决的问题」清单的处理结果：
+
+| 项 | 状态 | 说明 |
+| --- | --- | --- |
+| #1 重定向逐跳 SSRF 校验未在真实运行时验证 | 维持待部署复核 | 本机 `wrangler` 未登录（auth token 过期，非交互环境无法刷新），无法用 `--remote` 或部署验证；逐跳校验由 `safe-fetch.test.ts` 覆盖，部署后按 README「第 4 步」用 `redirect/5` 源复核 |
+| #2 真实 Cron 触发未验证 | 维持待部署复核 | 需部署后确认 Trigger 已注册并观察一次实际触发 |
+| #3 管理页主题切换未做真实浏览器交互验证（AC12） | 已补齐 | Chrome 实测：token 门渲染 → 填入 token 进入管理页，四面板（刷新状态/源管理/订阅链接/生成配置）均渲染；主题切换按钮双向生效：dark（`data-theme="dark"`、body 背景 `rgb(10, 10, 10)`）↔ light（`data-theme="light"`、`rgb(246, 248, 252)`），刷新后主题保持（初始化脚本生效，`localStorage["subboost-theme"]` 正确读写，token 存于 `subboost-worker-admin-token`）；截图留档。静态复核：`worker/dist` 全部产物对 `.dev.vars` 密钥值 0 命中；`check-ui-consistency` 359 文件无告警 |
+| #4 `worker:typecheck` 未纳入 CI | 已修复 | `.github/workflows/ci.yml` 的 `check` job 在 `lint` 后追加 `npm run worker:typecheck`；本机复核通过 |
+| #5 部署前待办 | 维持待用户操作 | 替换 `wrangler.jsonc` 占位 KV id、设置 `ADMIN_TOKEN`/`ENCRYPTION_KEY` secret、选择 Workers Paid 计划，均需用户 Cloudflare 账号操作 |
+| #6 本机（Windows）全量单测基线失败 | 已修复 | 双根因（见 1.7）：自定义路径 Git Bash 未被检测 + rollback 用例超 vitest 默认 5s 超时；修复后全量 260 文件 / 1844 用例通过，本机 Windows 首次全绿 |
+| #7 Windows `wrangler dev` 重建残留旧产物 | 维持登记状态 | 环境现象，`worker/README.md` 已登记处理方式，无代码改动 |
+
+质量门复核（本次全绿）：`npm run test:unit -- worker` 13 文件 / 158 用例通过；`npm run worker:typecheck` 通过；`check-ui-consistency` 359 文件无告警；全量 `npm run test:unit` 260 文件 / 1844 用例通过。
+
+改动说明：#4 与 #6 的修复涉及 `.github/workflows/ci.yml`（新增一步）、`test/setup-runtime.ts`（仅 Windows Git Bash 检测兜底）、`local/scripts/selfhost-lifecycle-shell.test.ts`（仅测试超时声明）；`local/` 应用与 `packages/*` 行为不变。
 
 
 
