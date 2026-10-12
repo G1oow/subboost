@@ -13,7 +13,10 @@
   },
   "kv_namespaces": [{ "binding": "SUBBOOST_KV", "id": "42834611908646e0ab13d9ff2ceba85a" }],
   "triggers": { "crons": ["0 */12 * * *"] },
-  "vars": { "APP_NAME": "SubBoost Lite" },
+    "vars": {
+    "ADMIN_TOKEN": "J8yQ*YGX%!Crn$A9ehwaCJyP",
+    "APP_NAME": "SubBoost Lite",
+    "ENCRYPTION_KEY": "LM^k&q78QF%zYe$!WFUaaNrc"},
   "observability": { "enabled": true }
 }
 
