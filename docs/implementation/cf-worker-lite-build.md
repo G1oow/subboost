@@ -118,9 +118,9 @@ git stash list
 | 路径 | 职责 | 依赖 |
 | --- | --- | --- |
 | `worker/package.json` | 包名 `@subboost/worker`，`private: true`，`type: module`，脚本与依赖 | 无 |
-| `worker/wrangler.jsonc` | Worker 名称、入口、兼容日期、KV 绑定、静态资源、Cron、vars | 无 |
+| `wrangler.jsonc`（仓库根） | Worker 名称、入口、兼容日期、KV 绑定、静态资源、Cron、vars、`previews`；放根目录以便 Workers Builds 默认命令零配置部署 | 无 |
 | `worker/tsconfig.json` | Worker 代码类型检查（无 DOM lib，使用 workers-types） | `packages/config/tsconfig.base.json` |
-| `worker/.dev.vars.example` | 本地密钥示例 | 无 |
+| `.dev.vars.example`（仓库根） | 本地密钥示例 | 无 |
 | `worker/README.md` | 指向两份文档的简短说明与部署命令 | 无 |
 | `worker/src/env.d.ts` | `Env` 接口 | `@cloudflare/workers-types` |
 | `worker/src/types.ts` | 存储类型、DTO、常量（KV key 前缀、TTL、上限） | `@subboost/core/types/node` |
@@ -395,7 +395,7 @@ ENCRYPTION_KEY=replace-with-at-least-32-random-chars
 
 #### Task 2.3 本地冒烟（需要 `.dev.vars`）
 
-- [x] 复制 `worker/.dev.vars.example` 为 `worker/.dev.vars` 并填入随机值。
+- [x] 复制 `.dev.vars.example` 为仓库根的 `.dev.vars` 并填入随机值。
 - [x] 先执行 `npm run worker:build`（此时 UI 可为空壳，确保 `worker/dist/index.html` 存在；若 Phase 3 未完成，可临时放置一个最小 `index.html`，并在 Phase 3 覆盖）。
 - [x] 在 `worker/` 执行 `npx wrangler dev --test-scheduled`，按第 5.3 节的 curl 序列验证。
 
@@ -796,11 +796,10 @@ curl -s "$B/__scheduled?cron=0+*/12+*+*+*"              # 之后 GET /api/state 
 
 ```bash
 npx wrangler login
-npx wrangler kv namespace create SUBBOOST_KV            # 把返回的 id 填入 worker/wrangler.jsonc
-cd worker
+npx wrangler kv namespace create SUBBOOST_KV            # 把返回的 id 填入仓库根的 wrangler.jsonc
 npx wrangler secret put ADMIN_TOKEN
 npx wrangler secret put ENCRYPTION_KEY
-cd ..
+npm run worker:deploy
 npm run worker:deploy
 ```
 

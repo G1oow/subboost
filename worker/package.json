@@ -5,10 +5,10 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --config ../wrangler.jsonc",
     "dev:ui": "vite --config ui/vite.config.ts --configLoader runner",
     "build": "vite build --config ui/vite.config.ts --configLoader runner",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && wrangler deploy --config ../wrangler.jsonc",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p ui/tsconfig.json"
   },
   "dependencies": {

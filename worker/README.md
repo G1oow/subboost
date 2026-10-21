@@ -11,7 +11,7 @@
 
 ```bash
 # 1. 准备本地密钥（不要提交）
-cp worker/.dev.vars.example worker/.dev.vars
+cp .dev.vars.example .dev.vars
 # 填入随机值：ADMIN_TOKEN、ENCRYPTION_KEY
 
 # 2. 构建管理页（输出到 worker/dist）
@@ -134,6 +134,50 @@ curl -s -D - "<订阅链接>" | head -20   # 200，头含 profile-update-interva
 - 管理页提示 token 无效：输入值与 `ADMIN_TOKEN` 不一致，重新执行 `wrangler secret put ADMIN_TOKEN` 后再试。
 - 订阅返回 503 `No nodes available`：所有源抓取失败或尚未刷新，先在管理页点「立即刷新」并查看状态面板的错误信息。
 - 订阅生成慢或超限：Free 计划 CPU 限制所致，升级 Paid 或等待 Cron 预生成缓存。
+
+## Git 集成部署（Workers Builds）
+
+上面是默认的本地 `wrangler deploy` 方式。如果你希望推送代码后由 Cloudflare 自动构建并部署（Dashboard 里 Create → Import a repository / “Continue with GitHub”），可以连接 GitHub 仓库走 Workers Builds。
+
+仓库已按 Workers Builds 的**默认命令**配置好，连接仓库后不需要改动任何构建设置：
+
+1. Workers & Pages → Create → Import a repository → 选择本仓库，Production branch 填 `main`。
+2. Root directory、Build command、Deploy command、Preview command 四项**全部保持默认**（`/`、留空、`npx wrangler deploy`、`npx wrangler preview`）。
+3. 在 Worker 的 Settings → Variables & Secrets 添加两个 Secret 类型的变量：`ADMIN_TOKEN`、`ENCRYPTION_KEY`。
+4. 推送代码即完成构建与部署。
+
+### 为什么零配置能跑
+
+- `wrangler.jsonc` 放在**仓库根目录**，`npx wrangler deploy` / `npx wrangler preview` 在 Root directory `/` 直接读到它；`main` 指向 `worker/src/index.ts`，`assets.directory` 指向 `worker/dist`，两个路径都相对配置文件解析。
+- 根 `package.json` 的 `prepare` 脚本会在 Workers Builds 安装依赖（`npm ci`）后自动执行 `npm run worker:build`，所以 Build command 可以留空；本地手动构建用 `npm run build`。
+- 非生产分支由 `npx wrangler preview` 部署，根配置里的 `previews: {}` 是这条命令的硬性要求，缺了会直接报错退出。
+
+### 前置
+
+- 仓库已推送到 GitHub（Workers Builds 只读你连接的那个仓库/分支）。
+- `wrangler.jsonc` 的 `kv_namespaces[0].id` 是真实 KV namespace id。Workers Builds 读取仓库里的配置，不读本地 `.dev.vars`；KV namespace id 不是敏感信息，可以提交。创建：`npx wrangler kv namespace create SUBBOOST_KV`，或在 Dashboard → Storage & Databases → KV 中创建。
+- Node 版本：Workers Builds 默认 Node 24.18.0，满足本仓库 `engines`（`>=24.0.0`）。如需与 CI 对齐，可在 Build 变量中设 `NODE_VERSION=22.19.0`。
+
+### 运行时 Secret
+
+Workers Builds 的 Build variables/secrets 只作用于构建阶段，不会注入运行时。`ADMIN_TOKEN`、`ENCRYPTION_KEY` 需在 Worker 的 Settings → Variables & Secrets 里添加为 **Secret** 类型（或部署后在仓库根执行 `npx wrangler secret put ADMIN_TOKEN`），否则管理接口按 fail closed 返回 503。
+
+### Preview（非生产分支）构建
+
+非 `main` 分支由 `npx wrangler preview` 部署，结果会挂到 PR 的检查项上。注意 Preview 环境**不继承**生产配置：根配置的 `previews` 块目前为空，预览实例因此没有 KV、`APP_NAME` 与 Secret，页面能打开但功能不完整。要让它可用：
+
+- 建一个独立的预览 KV，写进 `previews.kv_namespaces`（不要指向生产 KV，避免预览分支写入生产数据）。
+- `npx wrangler preview base-config secret put ADMIN_TOKEN` / `ENCRYPTION_KEY`。
+
+不需要分支预览时，可在 Settings → Build → Branch control 关闭 Enable Preview Builds。
+
+### 注意事项
+
+- Cron `0 */12 * * *` 由 `wrangler.jsonc` 声明，随每次部署注册，无需额外配置。
+- 每次 push 到 `main` 都会触发一次构建与部署，注意 Free 计划的构建额度与时长。
+- 部署后仍按上文「第 4 步：部署后验证」复核，尤其是重定向逐跳 SSRF 校验与 Cron 触发两项。
+- 本地 `npm run worker:deploy` 与 Workers Builds 部署的是同一个 Worker，两种方式可并存；同名 Worker 以后部署的为准，属正常覆盖行为。
+- 本地开发：`wrangler dev` 通过 `--config ../wrangler.jsonc` 读取根配置，`.dev.vars` 因此位于**仓库根目录**，`worker/.dev.vars` 不再被读取。
 
 ## 说明
 
