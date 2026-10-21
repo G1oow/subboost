@@ -20,6 +20,7 @@ import type {
   SourceNodesResponse,
   StatusRecord,
 } from "./lib/types";
+import { runPageTransition } from "./lib/view-transition";
 
 type SubscriptionResponse = { subscription: AppState["subscriptions"][number] };
 type SourcesResponse = { sources: AppState["sources"] };
@@ -115,10 +116,13 @@ export function App() {
 
   const navigate = React.useCallback((next: string) => {
     if (!isPageId(next)) return;
-    setPage(next);
-    if (typeof window !== "undefined" && window.location.hash !== `#/${next}`) {
-      window.location.hash = `#/${next}`;
-    }
+    // 用 View Transition 包住页面状态更新，实现新旧页面的交叉过渡而不是硬切
+    runPageTransition(() => {
+      setPage(next);
+      if (typeof window !== "undefined" && window.location.hash !== `#/${next}`) {
+        window.location.hash = `#/${next}`;
+      }
+    });
   }, []);
 
   const handleAuthenticated = (nextToken: string) => {

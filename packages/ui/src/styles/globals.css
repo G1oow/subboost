@@ -16,8 +16,10 @@
   --animate-float: float 7s ease-in-out infinite;
   --animate-spin-slow: spin 2.6s linear infinite;
   --animate-badge-pulse: badgePulse 2.4s ease-in-out infinite;
+  /* 页面交叉过渡：旧页淡出上移，新页淡入上移，两层短暂重叠 */
+  --animate-page-out: pageOut 0.26s cubic-bezier(0.4, 0, 1, 1) both;
+  --animate-page-enter: pageEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-
 :root {
   /* react-remove-scroll(-bar) 支持：用于在锁定滚动时补偿滚动条占位，避免水平抖动 */
   --removed-body-scroll-bar-size: 0px;
@@ -480,6 +482,7 @@
   .stagger-8 { animation-delay: 320ms; }
 
   /* 悬停微抬升 */
+  /* 悬停微抬升 */
   .hover-lift {
     transition:
       transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
@@ -506,6 +509,61 @@
   /* 进度条/占比条：左对齐缩放 */
   .bar-fill {
     transform-origin: left center;
+  }
+}
+
+/* 页面交叉过渡：需要放在 @layer 之外，Tailwind 才会按需保留 keyframes */
+@keyframes pageOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.994);
+  }
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.994);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ===== 页面切换：View Transitions 交叉过渡 =====
+   只在支持 view-transition-name 的浏览器生效；不支持的浏览器走 .animate-page-in 兜底。 */
+.page-content {
+  view-transition-name: page-content;
+}
+
+@supports (view-transition-name: none) {
+  /* 整页默认的淡入淡出关掉，避免和内容层叠加出现灰闪 */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+
+  ::view-transition-old(page-content),
+  ::view-transition-new(page-content) {
+    mix-blend-mode: normal;
+  }
+
+  ::view-transition-old(page-content) {
+    animation: pageOut 0.26s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  ::view-transition-new(page-content) {
+    animation: pageEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* 交叉过渡生效时关掉兜底入场动画，避免两层动画叠加 */
+  .page-content {
+    animation: none;
   }
 }
 
