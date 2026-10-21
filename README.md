@@ -39,7 +39,7 @@ test/         回归测试与测试基础设施
 npm ci
 
 # 1. 准备本地密钥（不要提交）
-cp worker/.dev.vars.example worker/.dev.vars   # 填入随机 ADMIN_TOKEN、ENCRYPTION_KEY
+cp .dev.vars.example .dev.vars   # 填入随机 ADMIN_TOKEN、ENCRYPTION_KEY
 
 # 2. 构建管理页
 npm run worker:build
@@ -48,7 +48,7 @@ npm run worker:build
 npm run worker:dev
 ```
 
-部署到 Cloudflare（创建 KV namespace、设置 secret、`wrangler deploy` 与部署后验证）见 **[worker/README.md](worker/README.md)**。
+部署到 Cloudflare（创建 KV namespace、设置 secret、`wrangler deploy` 与部署后验证）见 **[worker/README.md](worker/README.md)**；同一文档也说明了通过 Cloudflare Workers Builds 连接 GitHub 自动部署的方式。
 
 ## 常用命令
 

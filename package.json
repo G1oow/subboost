@@ -11,6 +11,8 @@
     "worker"
   ],
   "scripts": {
+    "build": "npm run worker:build",
+    "prepare": "npm run worker:build",
     "test:unit": "vitest run",
     "test:coverage": "vitest run --config vitest.coverage.ts --coverage",
     "test:core": "vitest run --config vitest.core.config.ts",
