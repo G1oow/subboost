@@ -5,6 +5,7 @@ import type { SubscriptionResponseInfo } from "@subboost/core/subscription/subsc
 import type { ParsedNode } from "@subboost/core/types/node";
 import { sha256Hex } from "./crypto";
 import { refreshSource, sanitizeErrorMessage, type RefreshSourceResult } from "./sources";
+import { applyNodeRenames } from "./node-renames";
 import type { fetchText } from "./safe-fetch";
 import type { Store } from "./store";
 import {
@@ -161,13 +162,16 @@ export async function generateSubscription(
 
   const seen = new Set<string>();
   const nodes: ParsedNode[] = [];
-  for (const snapshot of snapshots) {
+  for (let index = 0; index < snapshots.length; index += 1) {
+    const snapshot = snapshots[index];
     if (!snapshot) continue;
+    // 同一份快照的节点数不超过源上限，重命名只影响展示名，不影响去重身份
+    const renames = targets[index]?.nodeRenames;
     for (const node of snapshot.nodes) {
       const key = buildNodeContentKey(node);
       if (seen.has(key)) continue;
       seen.add(key);
-      nodes.push(node);
+      nodes.push(applyNodeRenames(node, renames));
     }
   }
 

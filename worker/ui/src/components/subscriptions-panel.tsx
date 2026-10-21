@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Copy, Link2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@subboost/ui/components/ui/card";
@@ -20,25 +20,53 @@ import { copyTextToClipboard } from "@subboost/ui/lib/clipboard";
 import { cn } from "@subboost/ui/lib/utils";
 import type { AppState, SubscriptionDto } from "../lib/types";
 
+export type SubscriptionUpdatePatch = {
+  name?: string;
+  sourceIds?: string[];
+};
+
 export type SubscriptionsPanelProps = {
   state: AppState;
   onCreate: (input: { name: string; sourceIds: string[] }) => Promise<void>;
   onRotate: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  /** 修改已创建订阅的名称与所含源（链接不变） */
+  onUpdate?: (id: string, patch: SubscriptionUpdatePatch) => Promise<void>;
 };
 
-export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: SubscriptionsPanelProps) {
+export function SubscriptionsPanel({
+  state,
+  onCreate,
+  onRotate,
+  onDelete,
+  onUpdate,
+}: SubscriptionsPanelProps) {
   const { toast } = useToast();
   const [open, setOpen] = React.useState(false);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
   const [name, setName] = React.useState("");
   const [selected, setSelected] = React.useState<string[]>([]);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState("");
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
+  const sourceNameById = React.useMemo(
+    () => new Map(state.sources.map((source) => [source.id, source.name])),
+    [state.sources]
+  );
+
   const openCreate = () => {
+    setEditingId(null);
     setName("");
     setSelected([]);
+    setError("");
+    setOpen(true);
+  };
+
+  const openEdit = (subscription: SubscriptionDto) => {
+    setEditingId(subscription.id);
+    setName(subscription.name);
+    setSelected(subscription.sourceIds);
     setError("");
     setOpen(true);
   };
@@ -58,11 +86,20 @@ export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: Subs
     }
     setSaving(true);
     try {
-      await onCreate({ name: name.trim(), sourceIds: selected });
-      toast({ variant: "success", title: "已创建订阅" });
+      if (editingId) {
+        if (!onUpdate) {
+          setError("当前版本不支持修改订阅。");
+          return;
+        }
+        await onUpdate(editingId, { name: name.trim(), sourceIds: selected });
+        toast({ variant: "success", title: "已更新订阅", description: "链接保持不变，下次访问即按新源生成。" });
+      } else {
+        await onCreate({ name: name.trim(), sourceIds: selected });
+        toast({ variant: "success", title: "已创建订阅" });
+      }
       setOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建失败");
+      setError(err instanceof Error ? err.message : "保存失败");
     } finally {
       setSaving(false);
     }
@@ -118,10 +155,33 @@ export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: Subs
     }
   };
 
+  const renderBoundSources = (subscription: SubscriptionDto) => {
+    if (subscription.sourceIds.length === 0) {
+      return <Badge variant="secondary">全部启用源</Badge>;
+    }
+    const names = subscription.sourceIds.map((id) => sourceNameById.get(id) ?? "已删除的源");
+    const visible = names.slice(0, 2);
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        {visible.map((item, index) => (
+          <Badge key={`${item}-${index}`} variant="outline" className="max-w-[120px] truncate">
+            {item}
+          </Badge>
+        ))}
+        {names.length > visible.length ? (
+          <Badge variant="secondary">+{names.length - visible.length}</Badge>
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle>订阅链接</CardTitle>
+        <div className="space-y-1">
+          <CardTitle>订阅链接</CardTitle>
+          <p className="text-xs text-fg-45">随时修改名称或所含源，链接本身不会变化。</p>
+        </div>
         <Button onClick={openCreate} disabled={state.sources.length === 0}>
           <Plus aria-hidden="true" />
           创建订阅
@@ -129,7 +189,10 @@ export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: Subs
       </CardHeader>
       <CardContent>
         {state.sources.length === 0 ? (
-          <p className="text-sm text-fg-50">请先添加源，再创建订阅链接。</p>
+          <div className="rounded-xl border border-dashed border-ink/15 px-4 py-10 text-center">
+            <Link2 aria-hidden="true" className="mx-auto mb-2 h-6 w-6 text-fg-35" />
+            <p className="text-sm text-fg-50">请先添加源，再创建订阅链接。</p>
+          </div>
         ) : state.subscriptions.length === 0 ? (
           <p className="text-sm text-fg-50">还没有订阅，点击「创建订阅」生成一条链接。</p>
         ) : (
@@ -137,20 +200,20 @@ export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: Subs
             <TableHeader>
               <TableRow>
                 <TableHead>名称</TableHead>
-                <TableHead>源数量</TableHead>
+                <TableHead>所含源</TableHead>
                 <TableHead>链接</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {state.subscriptions.map((subscription) => (
-                <TableRow key={subscription.id}>
+              {state.subscriptions.map((subscription, index) => (
+                <TableRow
+                  key={subscription.id}
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
+                >
                   <TableCell className="font-medium text-fg">{subscription.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {subscription.sourceIds.length === 0 ? "全部启用源" : subscription.sourceIds.length}
-                    </Badge>
-                  </TableCell>
+                  <TableCell>{renderBoundSources(subscription)}</TableCell>
                   <TableCell className="max-w-[280px] truncate font-mono text-xs text-fg-50">
                     {subscription.link}
                   </TableCell>
@@ -166,6 +229,15 @@ export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: Subs
                           className={cn(copiedId === subscription.id ? "hidden" : undefined)}
                         />
                       </IconButton>
+                      {onUpdate ? (
+                        <IconButton
+                          label={`修改 ${subscription.name} 的源`}
+                          variant="ghost"
+                          onClick={() => openEdit(subscription)}
+                        >
+                          <Pencil aria-hidden="true" />
+                        </IconButton>
+                      ) : null}
                       <IconButton label={`轮换 ${subscription.name} token`} variant="ghost" onClick={() => handleRotate(subscription)}>
                         <RefreshCw aria-hidden="true" />
                       </IconButton>
@@ -182,9 +254,9 @@ export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: Subs
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>创建订阅</DialogTitle>
+            <DialogTitle>{editingId ? "修改订阅" : "创建订阅"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField label="名称" required>
@@ -197,24 +269,42 @@ export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: Subs
 
             <div className="space-y-2">
               <p className="text-sm font-medium text-fg-80">绑定源</p>
-              <p className="text-xs text-fg-45">不选择任何源表示使用全部启用源。</p>
+              <p className="text-xs text-fg-45">
+                不选择任何源表示使用全部启用源；勾选后只聚合这些源。
+              </p>
               <div className="grid gap-2">
-                {state.sources.map((source) => {
+                {state.sources.map((source, index) => {
                   const checked = selected.includes(source.id);
                   return (
                     <button
                       key={source.id}
                       type="button"
                       onClick={() => toggleSource(source.id)}
+                      aria-pressed={checked}
                       className={cn(
-                        "flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                        "animate-fade-in-up flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-all duration-200",
                         checked
                           ? "border-primary-500/50 bg-primary-500/20 text-fg"
-                          : "border-ink/10 bg-ink/5 text-fg-70 hover:bg-ink/10"
+                          : "border-ink/10 bg-ink/5 text-fg-70 hover:-translate-y-px hover:bg-ink/10"
                       )}
+                      style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                     >
-                      <span>{source.name}</span>
-                      <span className="text-xs text-fg-45">{source.kind === "remote" ? "远程" : "手动"}</span>
+                      <span className="flex items-center gap-2">
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "flex h-4 w-4 items-center justify-center rounded border transition-colors",
+                            checked ? "border-primary-500 bg-primary-500/70" : "border-ink/25"
+                          )}
+                        >
+                          {checked ? <Check className="h-3 w-3 text-fg" /> : null}
+                        </span>
+                        {source.name}
+                      </span>
+                      <span className="text-xs text-fg-45">
+                        {source.kind === "remote" ? "远程" : "手动"}
+                        {source.enabled ? "" : " · 已停用"}
+                      </span>
                     </button>
                   );
                 })}
@@ -232,7 +322,7 @@ export function SubscriptionsPanel({ state, onCreate, onRotate, onDelete }: Subs
                 取消
               </Button>
               <Button type="submit" disabled={saving}>
-                {saving ? "创建中…" : "创建"}
+                {saving ? "保存中…" : editingId ? "保存修改" : "创建"}
               </Button>
             </DialogFooter>
           </form>

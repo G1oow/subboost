@@ -148,14 +148,18 @@ git stash list
 | `worker/ui/public/_headers` | 静态资源安全头（U3） | 无 |
 | `worker/ui/src/main.tsx` | 挂载 React、`<Toaster />` | `@subboost/ui/components/ui/toaster` |
 | `worker/ui/src/styles.css` | `@import "@subboost/ui/styles/globals.css";`（U2） | 无 |
-| `worker/ui/src/app.tsx` | 根组件：token 门或工作台 | 下列组件 |
+| `worker/ui/src/app.tsx` | 根组件：token 门或工作台；hash 路由（`#/dashboard` 等）与页面切换、`/api/dashboard` 加载 | 下列组件 |
 | `worker/ui/src/lib/admin-token.ts` | localStorage 读写 | 无 |
-| `worker/ui/src/lib/api-client.ts` | 带 Bearer 的 fetch 封装、401 处理、错误读取 | `@subboost/ui/lib/utils` |
-| `worker/ui/src/components/app-shell.tsx` | 顶栏（标题、主题切换、退出） | `@subboost/ui/theme/theme` |
+| `worker/ui/src/lib/api-client.ts` | 带 Bearer 的 fetch 封装（支持 GET/PUT/POST/PATCH/DELETE）、401 处理、错误读取 | `@subboost/ui/lib/utils` |
+| `worker/ui/src/lib/format.ts` | 时间/时长/百分比/千分位格式化（纯函数） | 无 |
+| `worker/ui/src/lib/use-animated-number.ts` | 数值补间 hook（仪表板计数动画） | react |
+| `worker/ui/src/components/app-shell.tsx` | 顶栏（标题、刷新、主题切换、退出）+ 页面导航（滑动下划线、图标缩放、数量徽章） | `@subboost/ui/theme/theme` |
+| `worker/ui/src/components/dashboard-panel.tsx` | 仪表板：健康徽章、统计卡、协议分布、源健康、提醒、快捷操作 | Card、Badge、Button、ProtocolBadge |
+| `worker/ui/src/components/node-rename-editor.tsx` | 节点列表 + 逐节点改名（协议徽章、原名、还原、搜索） | Input、IconButton、ProtocolBadge |
 | `worker/ui/src/components/token-gate.tsx` | token 输入页 | Button、FormField、PasswordField |
 | `worker/ui/src/components/status-panel.tsx` | 最近刷新状态与「立即刷新」 | Button、Badge、Table |
-| `worker/ui/src/components/sources-panel.tsx` | 源列表与编辑对话框 | Table、Dialog、Input、Textarea、Switch、Select |
-| `worker/ui/src/components/subscriptions-panel.tsx` | 订阅列表、创建、复制、轮换、删除 | Table、Dialog、ConfirmDialog、Button |
+| `worker/ui/src/components/sources-panel.tsx` | 源列表与编辑对话框；手动节点文本防抖解析出名称/协议并可就地改名；行内「节点」对话框可对已有快照改名 | Table、Dialog、Input、Textarea、Switch、Select、NodeRenameEditor |
+| `worker/ui/src/components/subscriptions-panel.tsx` | 订阅列表、创建、修改所含源、复制、轮换、删除 | Table、Dialog、ConfirmDialog、Button |
 | `worker/ui/src/components/config-panel.tsx` | 配置 JSON 编辑与重置 | Textarea、Button |
 | `worker/ui/src/lib/*.test.ts` | `admin-token`、`api-client` 单测 | vitest |
 
@@ -449,17 +453,19 @@ export default defineConfig({
 - [x] 测试 `worker/ui/src/lib/api-client.test.ts`：请求头含 `Authorization: Bearer <token>`；收到 401 时调用 `onUnauthorized` 并抛错；非 2xx 时错误消息来自 `readApiErrorMessage`。
 - [x] 实现 `admin-token.ts`、`api-client.ts`（契约见 4.11）。
 - [x] 实现 `token-gate.tsx`：布局与 `local/src/components/local-login.tsx` 一致（居中卡片 `bg-ink/5 border border-ink/10 rounded-2xl p-6`），使用 `FormField` + `PasswordField` + `Button`；提交后调用 `GET /api/state` 验证，失败显示「访问 token 无效」。
-- [x] 实现 `app.tsx`：无 token 渲染 `TokenGate`；有 token 渲染 `AppShell` 与四个面板；`api-client` 的 `onUnauthorized` 清除 token 并回到门页。
+- [x] 实现 `app.tsx`：无 token 渲染 `TokenGate`；有 token 渲染 `AppShell` 与五个页面（仪表板 / 源管理 / 订阅链接 / 刷新状态 / 生成配置），按 hash 路由切换并保存当前页；`/api/state` 成功后加载 `/api/dashboard`（失败降级）；`api-client` 的 `onUnauthorized` 清除 token 并回到门页。
 
 完成条件：单测通过；浏览器中输入错误 token 显示错误，正确 token 进入工作台。
 
-#### Task 3.3 四个面板
+#### Task 3.3 页面与面板
 
 - [x] `status-panel.tsx`：显示 `status.lastRunAt`、`lastTrigger`、每个源 ok/错误、每条订阅节点数；「立即刷新」调用 `POST /api/refresh`，409 时提示「刷新进行中」。
-- [x] `sources-panel.tsx`：表格列：名称、类型、启用、最近节点数（来自 status）、操作；对话框编辑 `name`、`kind`、`url` 或 `manualText`、`userAgent`、`enabled`；保存调用 `PUT /api/sources` 提交完整列表。
-- [x] `subscriptions-panel.tsx`：表格列：名称、源数、链接（截断显示 + 复制按钮，使用 `@subboost/ui/lib/clipboard` 若其导出适用，否则 `navigator.clipboard.writeText`）、操作（轮换、删除，均经 `ConfirmDialog`）；创建对话框含名称与源多选。
+- [x] `sources-panel.tsx`：表格列：名称（含「已改名 N 个节点」）、类型、启用、最近节点数（来自 status，失败带徽章）、操作（节点 / 编辑 / 删除）；对话框编辑 `name`、`kind`、`url` 或 `manualText`、`userAgent`、`enabled`；手动源粘贴节点文本后 450ms 防抖调用 `POST /api/nodes/parse`，用 `NodeRenameEditor` 列出协议徽章 + 原名并可就地改名；行内「节点」按钮调用 `GET /api/sources/:id/nodes` 打开改名对话框；保存均通过 `PUT /api/sources` 提交完整列表（携带 `nodeRenames`）。
+- [x] `subscriptions-panel.tsx`：表格列：名称、所含源（源名 chip，空为「全部启用源」）、链接（截断显示 + 复制按钮）、操作（修改 / 轮换 / 删除，轮换与删除均经 `ConfirmDialog`）；创建与修改共用对话框（名称 + 源多选），修改调用 `PATCH /api/subscriptions/:id` 并保持链接不变。
 - [x] `config-panel.tsx`：`Textarea` 展示 `JSON.stringify(config, null, 2)`；保存前本地 `JSON.parse` 校验，失败提示；「恢复默认」调用 `DELETE /api/config`。
-- [x] `app-shell.tsx`：标题取 `state.app.name`；主题切换按钮调用 `applyTheme` 与 `persistTheme`；「退出」清除 token。
+- [x] `dashboard-panel.tsx`：健康徽章 + 最近刷新摘要；4 张统计卡（`useAnimatedNumber` 计数补间）；协议分布（`animate-bar-grow` 进度条）；源健康列表；提醒（刷新失败 / 无快照 / 生成失败）；快捷操作跳转。
+- [x] `app-shell.tsx`：标题取 `state.app.name`；顶栏「刷新」调用 `POST /api/refresh`；页面导航带滑动下划线与数量徽章；主题切换按钮调用 `applyTheme` 与 `persistTheme`；「退出」清除 token。
+- [x] 动效：`packages/ui/src/styles/globals.css` 提供 `pageIn`/`rise`/`popIn`/`fadeInUp`/`shimmer`/`barGrow`/`float`/`badgePulse` 与 `stagger-1..8`、`hover-lift`、`skeleton` 工具类，并在 `prefers-reduced-motion: reduce` 下关闭动画。
 - [x] 所有颜色类只用 theme.css 令牌（`text-fg`、`text-fg-60`、`bg-surface`、`border-ink/10` 等）；图标用 `lucide-react`。
 - [x] 执行 `npm run lint`（含 `check-ui-consistency`）确保无告警。
 
@@ -688,18 +694,26 @@ export async function requireAdmin(request: Request, env: Env): Promise<void>;
 | PUT | `/api/config` | 是 | JSON 对象，上限 1 MiB | `200 { config, configIsDefault: false }` |
 | DELETE | `/api/config` | 是 | 无 | `200 { config, configIsDefault: true }` |
 | POST | `/api/subscriptions` | 是 | `{ name, sourceIds? }`，上限 64 KiB | `201 { subscription }` |
+| PATCH | `/api/subscriptions/:id` | 是 | `{ name?, sourceIds? }`，上限 64 KiB；`sourceIds` 必须引用现存源 | `200 { subscription }`；源不存在 `400 VALIDATION_ERROR`；清空该订阅的 YAML 缓存 |
 | DELETE | `/api/subscriptions/:id` | 是 | 无 | `204` |
 | POST | `/api/subscriptions/:id/rotate` | 是 | 无 | `200 { subscription }` |
+| GET | `/api/sources/:id/nodes` | 是 | 无 | `200 { source, fetchedAt, nodeCount, renamedCount, nodes, parseErrors }`；手动源无快照时即时解析 `manualText`；源不存在 `404` |
+| POST | `/api/nodes/parse` | 是 | `{ text, renames? }`，上限 1 MiB | `200 { nodes, totalParsed, totalFailed, errors }`；空文本返回空列表 |
+| GET | `/api/dashboard` | 是 | 无 | `200 DashboardStats`（源/订阅计数、节点总数、协议分布、逐源健康、最近刷新摘要、提醒） |
 | POST | `/api/refresh` | 是 | 无 | `200 { status }`；持锁 `409 REFRESH_IN_PROGRESS` |
 | GET、HEAD | `/sub/:token` | 否 | 无 | `200` YAML；`404` `Not found`；`503` `No nodes available` + `Retry-After: 600` |
 | 其他 `/api/*` | | | | `404 NOT_FOUND` JSON |
 | 其他路径 | | | | `env.ASSETS.fetch(request)` |
 
-`SourceInput` 校验顺序：数量 ≤ 50 → 每项 `name` 1 到 80 字符 → `kind` 合法 → remote 的 `url` 通过 `validatePublicHttpUrl` → manual 的 `manualText` ≤ 512 KiB 且 `parseSubscription` 得到 ≥1 节点 → `userAgent` 若存在 1 到 200 字符。错误消息格式：`第 <index+1> 个源：<原因>`。所有源的 `manualText` 之和同时受请求体 1 MiB 上限约束，超出时在读体阶段返回 413。
+`SourceInput` 校验顺序：数量 ≤ 50 → 每项 `name` 1 到 80 字符 → `kind` 合法 → remote 的 `url` 通过 `validatePublicHttpUrl` → manual 的 `manualText` ≤ 512 KiB 且 `parseSubscription` 得到 ≥1 节点 → `userAgent` 若存在 1 到 200 字符 → `nodeRenames` 逐项过滤（key 必须是 16 位小写十六进制，名称 trim 后 1 到 120 字符，最多 4000 条；无有效项时不落库）。错误消息格式：`第 <index+1> 个源：<原因>`。所有源的 `manualText` 之和同时受请求体 1 MiB 上限约束，超出时在读体阶段返回 413。
 
 `/sub/*` 的非 200 响应体一律为纯文本（`Not found`、`No nodes available`、`Internal error`），不使用 JSON 错误体；`/api/*` 的错误一律为 JSON 错误体。
 
 `app.version` 取 `worker/package.json` 的 `version`，通过 Vite/wrangler 构建时的 `import pkg from "../package.json"` 读取（`resolveJsonModule` 已在基线 tsconfig 开启）。
+
+**节点改名（`nodeRenames`）**：`SourceInput.nodeRenames` 是以节点内容指纹为 key 的显示名覆盖表，key 由 `worker/src/node-renames.ts` 的 `nodeRenameKey(node)` 用 `buildNodeContentKey` 计算。指纹不含 `name`，所以改名后 key 不变、可反复覆盖；服务器/端口/凭据等身份字段变化后 key 变化，旧映射自动失效（不会误改到别的节点）。重命名在 `generateSubscription` 聚合节点时应用，因此 `proxies` 与引用它的 `proxy-groups`、listener 等同时生效；`PUT /api/sources` 保存后会清空全部订阅缓存，改名立即反映到 `/sub/:token`，无需轮换链接。同名冲突仍由生成器的 `ensureUniqueProxyNames` 追加 ` (2)` 后缀兜底。
+
+**仪表板聚合（`GET /api/dashboard`）**：`worker/src/dashboard.ts` 的 `buildDashboardStats` 是纯函数，入参为源/订阅/状态/快照 Map，输出 `DashboardStats`（`sources`、`subscriptions`、`nodes.protocols`、`sourceStats`、`lastRun`、`warnings`）。节点总数与协议分布只统计启用源；`warnings` 覆盖刷新失败源、无快照源、生成失败订阅与空配置。管理页在 `/api/state` 加载成功后自动刷新该接口，失败时降级使用 `/api/state` 的 status 数据。
 
 ### 4.11 管理页 API 客户端
 
