@@ -242,7 +242,7 @@ lint：通过（eslint local packages --max-warnings=0 + check-ui-consistency，
 ```jsonc
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "subboost-worker-lite",
+  "name": "subboost",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -252,7 +252,7 @@ lint：通过（eslint local packages --max-warnings=0 + check-ui-consistency，
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/sub/*"]
   },
-  "kv_namespaces": [{ "binding": "SUBBOOST_KV", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+  "kv_namespaces": [{ "binding": "SUBBOOST_KV", "id": "<真实 KV namespace id，见部署文档>" }],
   "triggers": { "crons": ["0 */12 * * *"] },
   "vars": { "APP_NAME": "SubBoost Lite" },
   "observability": { "enabled": true }
