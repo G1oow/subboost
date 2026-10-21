@@ -6,10 +6,11 @@ import { ConfigPanel } from "./config-panel";
 import { DashboardPanel } from "./dashboard-panel";
 import { NodeRenameEditor } from "./node-rename-editor";
 import { SourcesPanel } from "./sources-panel";
+import { SourceNodesInline } from "./source-nodes-inline";
 import { StatusPanel } from "./status-panel";
 import { SubscriptionsPanel } from "./subscriptions-panel";
 import { TokenGate } from "./token-gate";
-import type { AppState, DashboardStats } from "../lib/types";
+import type { AppState, DashboardStats, SourceNodesResponse } from "../lib/types";
 
 const STATE: AppState = {
   app: { name: "SubBoost Lite", version: "0.1.0" },
@@ -239,5 +240,110 @@ describe("dashboard and node rename rendering", () => {
     );
     expect(html).toContain("已改名 1 个");
     expect(html).toContain("原名 香港 01");
+  });
+});
+
+const SOURCE_NODES: SourceNodesResponse = {
+  source: { id: "s1", name: "机场 A", kind: "remote", enabled: true, nodeRenames: {} },
+  fetchedAt: "2026-10-12T00:00:00.000Z",
+  nodeCount: 2,
+  renamedCount: 1,
+  nodes: [
+    {
+      key: "0123456789abcdef",
+      name: "HK-01",
+      originName: "香港 01",
+      type: "ss",
+      server: "hk.example.com",
+      port: 443,
+      renamed: true,
+    },
+    { key: "fedcba9876543210", name: "日本 02", originName: "日本 02", type: "vless", renamed: false },
+  ],
+  parseErrors: ["第 3 行无法解析"],
+};
+
+describe("dashboard source nodes expansion", () => {
+  it("renders source health rows as expandable buttons", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(DashboardPanel, {
+        state: STATE,
+        stats: STATS,
+        onRefresh: noopAsync,
+        onNavigate: () => {},
+        onLoadNodes: async () => SOURCE_NODES,
+      })
+    );
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-controls="source-nodes-s1"');
+  });
+
+  it("renders the loading placeholder while nodes are being fetched", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SourceNodesInline, { state: { status: "loading" } })
+    );
+    expect(html).toContain("正在读取节点");
+  });
+
+  it("renders a retry action when loading the nodes fails", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SourceNodesInline, {
+        state: { status: "error", message: "读取节点失败" },
+        onRetry: () => {},
+      })
+    );
+    expect(html).toContain("读取节点失败");
+    expect(html).toContain("重试");
+  });
+
+  it("renders the node list with rename hints and parse errors", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SourceNodesInline, {
+        state: { status: "ready", data: SOURCE_NODES },
+        onRetry: () => {},
+        onOpenSourceManager: () => {},
+      })
+    );
+    expect(html).toContain("共 2 个节点");
+    expect(html).toContain("已改名 1 个");
+    expect(html).toContain("抓取于");
+    expect(html).toContain("HK-01");
+    expect(html).toContain("原名 香港 01");
+    expect(html).toContain("hk.example.com:443");
+    expect(html).toContain("1 条节点解析失败");
+    expect(html).toContain("去改名");
+    expect(html).toContain("重新读取节点");
+  });
+
+  it("falls back to the empty hint when the source has no nodes", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SourceNodesInline, {
+        state: {
+          status: "ready",
+          data: { ...SOURCE_NODES, nodeCount: 0, renamedCount: 0, nodes: [], parseErrors: [] },
+        },
+        emptyHint: "该源还没有可解析的节点文本。",
+      })
+    );
+    expect(html).toContain("该源还没有可解析的节点文本。");
+  });
+
+  it("pages long node lists and notes the preview limit", () => {
+    const nodes = Array.from({ length: 35 }, (_unused, index) => ({
+      key: `key-${index}`,
+      name: `节点 ${index}`,
+      originName: `节点 ${index}`,
+      type: "ss",
+      renamed: false,
+    }));
+    const html = renderToStaticMarkup(
+      React.createElement(SourceNodesInline, {
+        state: { status: "ready", data: { ...SOURCE_NODES, nodeCount: 500, nodes } },
+      })
+    );
+    expect(html).toContain("仅列出前 35 个");
+    expect(html).toContain("再显示 5 个");
+    expect(html).toContain("节点 29");
+    expect(html).not.toContain("节点 30");
   });
 });

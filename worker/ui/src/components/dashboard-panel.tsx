@@ -3,6 +3,7 @@ import {
   Activity,
   ArrowRight,
   Boxes,
+  ChevronDown,
   CircleAlert,
   CircleCheck,
   Clock,
@@ -15,19 +16,21 @@ import {
   TriangleAlert,
   Waypoints,
 } from "lucide-react";
-import { Badge } from "@subboost/ui/components/ui/badge";
+import { Badge, badgeVariants } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@subboost/ui/components/ui/card";
 import { ProtocolBadge } from "@subboost/ui/components/ui/protocol-badge";
 import { cn } from "@subboost/ui/lib/utils";
 import { formatCount, formatDuration, formatPercent, formatRelativeTime } from "../lib/format";
 import { useAnimatedNumber } from "../lib/use-animated-number";
+import { SourceNodesInline, type SourceNodesLoadState } from "./source-nodes-inline";
 import type {
   AppState,
   DashboardSourceStat,
   DashboardStats,
   PageId,
   ProtocolCount,
+  SourceNodesResponse,
 } from "../lib/types";
 
 export type DashboardPanelProps = {
@@ -37,6 +40,8 @@ export type DashboardPanelProps = {
   refreshing?: boolean;
   onRefresh: () => Promise<void>;
   onNavigate: (page: PageId) => void;
+  /** 展开「源健康」某一行时读取该源的节点列表 */
+  onLoadNodes?: (sourceId: string) => Promise<SourceNodesResponse>;
 };
 
 const STAGGER = ["stagger-1", "stagger-2", "stagger-3", "stagger-4"];
@@ -125,11 +130,52 @@ export function DashboardPanel({
   refreshing = false,
   onRefresh,
   onNavigate,
+  onLoadNodes,
 }: DashboardPanelProps) {
   const sourceStats = React.useMemo(
     () => stats?.sourceStats ?? buildFallbackSourceStats(state),
     [stats, state]
   );
+
+  const [expandedSourceId, setExpandedSourceId] = React.useState<string | null>(null);
+  const [sourceNodes, setSourceNodes] = React.useState<Record<string, SourceNodesLoadState>>({});
+  const [showAllSources, setShowAllSources] = React.useState(false);
+
+  const loadSourceNodes = React.useCallback(
+    async (sourceId: string) => {
+      if (!onLoadNodes) {
+        setSourceNodes((current) => ({
+          ...current,
+          [sourceId]: { status: "error", message: "当前版本不支持读取节点列表。" },
+        }));
+        return;
+      }
+      setSourceNodes((current) => ({ ...current, [sourceId]: { status: "loading" } }));
+      try {
+        const data = await onLoadNodes(sourceId);
+        setSourceNodes((current) => ({ ...current, [sourceId]: { status: "ready", data } }));
+      } catch (err) {
+        setSourceNodes((current) => ({
+          ...current,
+          [sourceId]: {
+            status: "error",
+            message: err instanceof Error ? err.message : "加载节点失败",
+          },
+        }));
+      }
+    },
+    [onLoadNodes]
+  );
+
+  // 再点一次同一行就收起；首次展开时才请求节点，之后复用缓存
+  const toggleSourceNodes = (sourceId: string) => {
+    if (expandedSourceId === sourceId) {
+      setExpandedSourceId(null);
+      return;
+    }
+    setExpandedSourceId(sourceId);
+    if (!sourceNodes[sourceId]) void loadSourceNodes(sourceId);
+  };
 
   const enabledSources = stats?.sources.enabled ?? state.sources.filter((item) => item.enabled).length;
   const totalSources = stats?.sources.total ?? state.sources.length;
@@ -326,42 +372,95 @@ export function DashboardPanel({
               <p className="py-6 text-center text-sm text-fg-45">还没有源。</p>
             ) : (
               <ul className="space-y-2">
-                {sourceStats.slice(0, 6).map((item, index) => (
-                  <li
-                    key={item.sourceId}
-                    className="animate-fade-in-up flex items-center gap-3 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2"
-                    style={{ animationDelay: `${index * 40}ms` }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "h-2 w-2 shrink-0 rounded-full",
-                        !item.enabled
-                          ? "bg-fg-30"
-                          : item.ok === false
-                            ? "animate-badge-pulse bg-red-400"
-                            : item.ok === true
-                              ? "bg-emerald-400"
-                              : "bg-fg-40"
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-fg-80">{item.name}</p>
-                      <p className="text-[11px] text-fg-40">
-                        {item.kind === "remote" ? "远程" : "手动"}
-                        {item.enabled ? "" : " · 已停用"}
-                        {item.renamedCount > 0 ? ` · 改名 ${item.renamedCount}` : ""}
-                      </p>
-                    </div>
-                    <Badge variant={item.ok === false ? "destructive" : "secondary"}>
-                      {formatCount(item.nodeCount)}
-                    </Badge>
-                  </li>
-                ))}
+                {(showAllSources ? sourceStats : sourceStats.slice(0, 6)).map((item, index) => {
+                  const expanded = expandedSourceId === item.sourceId;
+                  const panelId = `source-nodes-${item.sourceId}`;
+                  return (
+                    <li key={item.sourceId} className="animate-fade-in-up" style={{ animationDelay: `${index * 40}ms` }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSourceNodes(item.sourceId)}
+                        aria-expanded={expanded}
+                        aria-controls={panelId}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors duration-200",
+                          expanded
+                            ? "border-primary-500/40 bg-primary-500/10"
+                            : "border-ink/10 bg-ink/5 hover:border-ink/25 hover:bg-ink/10"
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "h-2 w-2 shrink-0 rounded-full",
+                            !item.enabled
+                              ? "bg-fg-30"
+                              : item.ok === false
+                                ? "animate-badge-pulse bg-red-400"
+                                : item.ok === true
+                                  ? "bg-emerald-400"
+                                  : "bg-fg-40"
+                          )}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-fg-80">{item.name}</span>
+                          <span className="block text-[11px] text-fg-40">
+                            {item.kind === "remote" ? "远程" : "手动"}
+                            {item.enabled ? "" : " · 已停用"}
+                            {item.renamedCount > 0 ? ` · 改名 ${item.renamedCount}` : ""}
+                          </span>
+                        </span>
+                        <span
+                          className={badgeVariants({
+                            variant: item.ok === false ? "destructive" : "secondary",
+                          })}
+                        >
+                          {formatCount(item.nodeCount)}
+                        </span>
+                        <ChevronDown
+                          aria-hidden="true"
+                          className={cn(
+                            "h-4 w-4 shrink-0 text-fg-40 transition-transform duration-300",
+                            expanded && "rotate-180 text-primary-200"
+                          )}
+                        />
+                      </button>
+                      {expanded ? (
+                        <div
+                          id={panelId}
+                          className="animate-fade-in-up mt-2 rounded-xl border border-ink/10 bg-ink/5 p-3"
+                        >
+                          <SourceNodesInline
+                            state={sourceNodes[item.sourceId] ?? { status: "loading" }}
+                            onRetry={() => void loadSourceNodes(item.sourceId)}
+                            onOpenSourceManager={() => onNavigate("sources")}
+                            emptyHint={
+                              item.kind === "manual"
+                                ? "该源还没有可解析的节点文本。"
+                                : "还没有节点快照，先刷新一次即可看到节点。"
+                            }
+                          />
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {sourceStats.length > 6 ? (
-              <p className="mt-2 text-[11px] text-fg-35">还有 {sourceStats.length - 6} 个源未显示。</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-2 w-full"
+                onClick={() => setShowAllSources((current) => !current)}
+              >
+                {showAllSources ? "收起" : `展开全部 ${sourceStats.length} 个源`}
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn("transition-transform duration-300", showAllSources && "rotate-180")}
+                />
+              </Button>
             ) : null}
           </CardContent>
         </Card>
