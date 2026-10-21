@@ -156,7 +156,7 @@ curl -s -D - "<订阅链接>" | head -20   # 200，头含 profile-update-interva
 
 - 仓库已推送到 GitHub（Workers Builds 只读你连接的那个仓库/分支）。
 - `wrangler.jsonc` 的 `kv_namespaces[0].id` 是真实 KV namespace id。Workers Builds 读取仓库里的配置，不读本地 `.dev.vars`；KV namespace id 不是敏感信息，可以提交。创建：`npx wrangler kv namespace create SUBBOOST_KV`，或在 Dashboard → Storage & Databases → KV 中创建。
-- Node 版本：Workers Builds 默认 Node 24.18.0，满足本仓库 `engines`（`>=24.0.0`）。如需与 CI 对齐，可在 Build 变量中设 `NODE_VERSION=22.19.0`。
+- Node 版本：Workers Builds 构建镜像默认 Node 24.18.0，低于 2026-10 安全版本线（22.23.4 / 24.22.1，含 CVE-2026-105482 / 105483 / 106069 / 106072 / 111497）。仓库根目录已放 `.nvmrc`（`24.22.1`），Workers Builds 会自动识别并覆盖默认版本，无需在 Dashboard 配置 `NODE_VERSION`。CI 与本地同用 24.22.1。
 
 ### 运行时 Secret
 

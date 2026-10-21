@@ -33,7 +33,7 @@ test/         回归测试与测试基础设施
 
 ## 快速开始
 
-前置：Node 22.13+（或 24+）与 npm，本地运行不需要 Cloudflare 账号。
+前置：Node 24.22.1+ 与 npm（版本见 `.nvmrc`，`nvm use` 可直接切换），本地运行不需要 Cloudflare 账号。
 
 ```bash
 npm ci
