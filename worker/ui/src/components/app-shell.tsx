@@ -136,7 +136,7 @@ export function AppShell({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        <div key={activeNav ?? "page"} className="animate-page-in space-y-6">
+        <div key={activeNav ?? "page"} className="page-content animate-page-in space-y-6">
           {children}
         </div>
       </main>
