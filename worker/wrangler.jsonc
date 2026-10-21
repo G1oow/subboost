@@ -13,10 +13,9 @@
   },
   "kv_namespaces": [{ "binding": "SUBBOOST_KV", "id": "42834611908646e0ab13d9ff2ceba85a" }],
   "triggers": { "crons": ["0 */12 * * *"] },
-    "vars": {
-    "ADMIN_TOKEN": "J8yQ*YGX%!Crn$A9ehwaCJyP",
-    "APP_NAME": "SubBoost Lite",
-    "ENCRYPTION_KEY": "LM^k&q78QF%zYe$!WFUaaNrc"},
+  // 密钥不进仓库：ADMIN_TOKEN / ENCRYPTION_KEY 必须用 `npx wrangler secret put <NAME> --config worker/wrangler.jsonc`
+  // 或在 Cloudflare Dashboard → Worker → Settings → Variables and Secrets 里添加为 Secret 类型。
+  "vars": { "APP_NAME": "SubBoost Lite" },
   "observability": { "enabled": true }
 }
 
