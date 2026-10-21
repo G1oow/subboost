@@ -272,6 +272,7 @@ export function App() {
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
                 onNavigate={navigate}
+                onLoadNodes={handleLoadNodes}
               />
             ) : null}
             {page === "sources" ? (
