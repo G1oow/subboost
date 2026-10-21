@@ -59,7 +59,7 @@
 ### 1.5 不允许修改的文件
 
 - `local/**`
-- `packages/core/**`、`packages/server-core/**`、`packages/ui/**`、`packages/config/**`
+- `packages/core/**`、`packages/server-core/**`、`packages/ui/**`
 - `prisma/**`、`local/Dockerfile`、`local/docker-compose*.yml`
 - `.github/workflows/**`
 - `README.md`、`README-CN.md`（如需指引，只在 `worker/README.md` 中写）
@@ -119,7 +119,7 @@ git stash list
 | --- | --- | --- |
 | `worker/package.json` | 包名 `@subboost/worker`，`private: true`，`type: module`，脚本与依赖 | 无 |
 | `wrangler.jsonc`（仓库根） | Worker 名称、入口、兼容日期、KV 绑定、静态资源、Cron、vars、`previews`；放根目录以便 Workers Builds 默认命令零配置部署 | 无 |
-| `worker/tsconfig.json` | Worker 代码类型检查（无 DOM lib，使用 workers-types） | `packages/config/tsconfig.base.json` |
+| `worker/tsconfig.json` | Worker 代码类型检查（无 DOM lib，使用 workers-types） | `tsconfig.base.json`（仓库根） |
 | `.dev.vars.example`（仓库根） | 本地密钥示例 | 无 |
 | `worker/README.md` | 指向两份文档的简短说明与部署命令 | 无 |
 | `worker/src/env.d.ts` | `Env` 接口 | `@cloudflare/workers-types` |
@@ -144,7 +144,7 @@ git stash list
 | --- | --- | --- |
 | `worker/ui/index.html` | SPA 入口；`<html lang="zh-CN" data-theme="dark">`；`<head>` 内放置占位注释 `<!--THEME_INIT-->`，由 `vite.config.ts` 中的小插件在构建时替换为 `<script>` + `THEME_INIT_SCRIPT` 内容，保证与 `packages/ui` 单一来源 | `@subboost/ui/theme/theme-init-script` |
 | `worker/ui/vite.config.ts` | Vite 配置：react 插件、tailwind 插件、别名、`build.outDir` 为 `../dist`、开发代理 | 无 |
-| `worker/ui/tsconfig.json` | UI 类型检查（DOM lib，`jsx: react-jsx`） | `packages/config/tsconfig.base.json` |
+| `worker/ui/tsconfig.json` | UI 类型检查（DOM lib，`jsx: react-jsx`） | `tsconfig.base.json`（仓库根） |
 | `worker/ui/public/_headers` | 静态资源安全头（U3） | 无 |
 | `worker/ui/src/main.tsx` | 挂载 React、`<Toaster />` | `@subboost/ui/components/ui/toaster` |
 | `worker/ui/src/styles.css` | `@import "@subboost/ui/styles/globals.css";`（U2） | 无 |
@@ -193,7 +193,7 @@ lint：通过（eslint local packages --max-warnings=0 + check-ui-consistency，
 
 - [x] 向用户出示并取得确认的新依赖清单（均只声明在 `worker/package.json`）：
   - devDependencies：`wrangler`（^4.149.0）、`@cloudflare/workers-types`（^5.20261011.1）、`vite`（^8.3.0，与锁文件现有 8.3.0 同大版本）、`@vitejs/plugin-react`（^6.1.2，见 Plan U1）、`@tailwindcss/vite`（^4.3.0）。
-  - dependencies：`@subboost/core`、`@subboost/server-core`、`@subboost/ui`（均为 `file:../packages/...` 工作区引用，写法与 `local/package.json` 一致）、`react`、`react-dom`（与根版本一致 `^19.2.7`）、`lucide-react`（`^1.17.0`）。tsconfig 通过相对路径继承 `packages/config/tsconfig.base.json`，不需要声明 `@subboost/config`。
+  - dependencies：`@subboost/core`、`@subboost/server-core`、`@subboost/ui`（均为 `file:../packages/...` 工作区引用，写法与 `local/package.json` 一致）、`react`、`react-dom`（与根版本一致 `^19.2.7`）、`lucide-react`（`^1.17.0`）。tsconfig 通过相对路径继承仓库根的 `tsconfig.base.json`。
 - [x] 确认后再执行 Task 0.3。
 
 完成条件：用户明确同意。
@@ -259,7 +259,7 @@ lint：通过（eslint local packages --max-warnings=0 + check-ui-consistency，
 }
 ```
 
-- [x] 创建 `worker/tsconfig.json`：`extends: "../packages/config/tsconfig.base.json"`；`compilerOptions`：`lib: ["esnext"]`、`types: ["@cloudflare/workers-types/2023-07-01", "node"]`（`node` 是因为被 import 的 `packages/core/src/parser/base64.ts` 使用了 `Buffer`，见 Plan U10）、`jsx` 不设置、`paths` 复制根 `tsconfig.json` 的 `@subboost/*` 映射并把前缀改为 `../packages/...`；`include: ["src/**/*.ts"]`。
+- [x] 创建 `worker/tsconfig.json`：`extends: "../tsconfig.base.json"`；`compilerOptions`：`lib: ["esnext"]`、`types: ["@cloudflare/workers-types/2023-07-01", "node"]`（`node` 是因为被 import 的 `packages/core/src/parser/base64.ts` 使用了 `Buffer`，见 Plan U10）、`jsx` 不设置、`paths` 复制根 `tsconfig.json` 的 `@subboost/*` 映射并把前缀改为 `../packages/...`；`include: ["src/**/*.ts"]`。
 - [x] 创建 `worker/ui/tsconfig.json`：`extends` 同上；`lib: ["dom", "dom.iterable", "esnext"]`、`jsx: "react-jsx"`、同样的 `paths`（前缀 `../../packages/...`）；`include: ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]`。
 - [x] 创建 `worker/src/env.d.ts`（契约见 4.1）。
 - [x] 创建 `worker/.dev.vars.example`：
@@ -814,7 +814,7 @@ npm run worker:deploy
 | K1 | `@vitejs/plugin-react` 与 vite 8 peer 冲突（Plan U1） | 选用声明兼容 vite 8 的版本；记录到 1.7 | 非阻塞 |
 | K2 | CSS 裸包导入不解析（Plan U2） | 改相对路径 | 非阻塞 |
 | K3 | `_headers` 不生效（Plan U3） | 改 `run_worker_first: true`，在 `index.ts` 对 `ASSETS.fetch` 的响应追加同一组头 | 非阻塞 |
-| K4 | eslint-config-next 误报（Plan U4） | 最小作用域覆盖 | 非阻塞 |
+| K4 | eslint-config-next 误报（Plan U4） | 后续整体替换为 typescript-eslint + jsx-a11y + react-hooks，不再依赖 Next 预设 | 已解决 |
 | K5 | `import "peggy"` 在 workerd 模块求值失败（Plan U5） | 在 `wrangler.jsonc` 增加模块别名（字段名以当前 wrangler 配置文档为准，Plan U9），把 `peggy` 指向 `./src/shims/peggy-stub.ts`，该文件只导出抛错的 `generate`；记录到 1.7 | 非阻塞 |
 | K6 | 大订阅现场生成超 CPU（Plan U6） | 以 Cron 预生成为主；README 建议 Paid | 非阻塞 |
 | K13 | `@types/node` 与 workers-types 类型冲突（Plan U10） | 优先在 worker tsconfig 内解决（调整 `types` 顺序或最小 `declare`）；不得修改 `packages/core` | 非阻塞 |

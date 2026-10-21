@@ -1,5 +1,5 @@
 {
-  "extends": "../packages/config/tsconfig.base.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["esnext", "dom"],
     "types": ["node"],
@@ -8,14 +8,9 @@
     "paths": {
       "@subboost/core": ["../packages/core/src/index.ts"],
       "@subboost/core/*": ["../packages/core/src/*"],
-      "@subboost/server-core": ["../packages/server-core/src/index.ts"],
       "@subboost/server-core/*": ["../packages/server-core/src/*"],
-      "@subboost/ui": ["../packages/ui/src/index.ts"],
       "@subboost/ui/*": ["../packages/ui/src/*"]
     }
   },
   "include": ["src/**/*.ts"]
 }
-
-
-

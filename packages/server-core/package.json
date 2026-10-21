@@ -5,19 +5,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./app-version": "./src/app-version.ts",
-    "./cron-auth": "./src/cron-auth.ts",
-    "./crypto": "./src/crypto/index.ts",
-    "./crypto/*": "./src/crypto/*.ts",
     "./http": "./src/http.ts",
-    "./session-revocation": "./src/session-revocation.ts",
-    "./rules": "./src/rules/index.ts",
-    "./rules/*": "./src/rules/*.ts",
-    "./templates": "./src/templates/index.ts",
-    "./templates/*": "./src/templates/*.ts",
-    "./subscription": "./src/subscription/index.ts",
-    "./subscription/*": "./src/subscription/*.ts"
+    "./subscription/response-headers": "./src/subscription/response-headers.ts",
+    "./subscription/user-agents": "./src/subscription/user-agents.ts"
   },
   "dependencies": {
     "@subboost/core": "file:../core"

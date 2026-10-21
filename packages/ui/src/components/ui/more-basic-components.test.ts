@@ -12,17 +12,8 @@ function mockPrimitive(tag: keyof React.JSX.IntrinsicElements, displayName: stri
 
 vi.mock("@radix-ui/react-label", () => ({ Root: mockPrimitive("label", "LabelRoot") }));
 
-import {
-  artisticNavContainerClassName,
-  artisticTabsIconClassName,
-  artisticTabsListClassName,
-  artisticTabsTriggerClassName,
-  getArtisticNavButtonClassName,
-  getArtisticNavIconClassName,
-} from "./artistic-nav";
 import { Label } from "./label";
 import { ProtocolBadge, getProtocolBadgeClass } from "./protocol-badge";
-import { SafeImage } from "./safe-image";
 import { Textarea } from "./textarea";
 
 describe("additional basic UI components", () => {
@@ -34,8 +25,6 @@ describe("additional basic UI components", () => {
         React.createElement(Label, { htmlFor: "name", className: "label-extra" }, "Name"),
         React.createElement(Textarea, { placeholder: "Write", className: "textarea-extra", readOnly: true }),
         React.createElement(ProtocolBadge, { type: "VMess", className: "badge-extra" }),
-        React.createElement(SafeImage, { src: "https://example.test/a.png", alt: "avatar", fallback: React.createElement("span", null, "fallback") }),
-        React.createElement(SafeImage, { src: null, fallback: React.createElement("span", null, "fallback") })
       )
     );
 
@@ -45,21 +34,10 @@ describe("additional basic UI components", () => {
     expect(html).toContain("placeholder=\"Write\"");
     expect(html).toContain("VMess");
     expect(html).toContain("badge-extra");
-    expect(html).toContain("src=\"https://example.test/a.png\"");
-    expect(html).toContain("fallback");
   });
 
-  it("computes protocol and artistic nav classes", () => {
+  it("computes protocol badge classes", () => {
     expect(getProtocolBadgeClass(" vmess ")).toContain("purple");
     expect(getProtocolBadgeClass("unknown")).toContain("slate");
-    expect(getArtisticNavButtonClassName({ active: true, size: "md", className: "extra" })).toContain("extra");
-    expect(getArtisticNavButtonClassName({ active: true, size: "md" })).toContain("text-seg-active-fg");
-    expect(getArtisticNavButtonClassName({ active: false })).toContain("hover:bg-ink/5");
-    expect(getArtisticNavIconClassName(true, "icon-extra")).toContain("icon-extra");
-    expect(getArtisticNavIconClassName(false)).toContain("text-fg-45");
-    expect(artisticNavContainerClassName).toContain("rounded-full");
-    expect(artisticTabsListClassName).toContain("h-auto");
-    expect(artisticTabsTriggerClassName).toContain("data-[state=active]");
-    expect(artisticTabsIconClassName).toContain("group-data-[state=active]");
   });
 });

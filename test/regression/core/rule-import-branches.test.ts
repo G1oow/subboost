@@ -7,9 +7,8 @@ import {
   normalizeRuleListLines,
 } from "../../../packages/core/src/rules/cn-candidate-utils";
 import { parseCustomRuleBatchImport } from "../../../packages/core/src/rules/custom-rule-batch-import";
-import { isPrivateOrReservedIp } from "../../../packages/server-core/src/subscription/ssrf-ip";
 
-describe("public rule and SSRF edge branch coverage", () => {
+describe("public rule edge branch coverage", () => {
   it("parses sparse custom-rule batch imports without losing row diagnostics", () => {
     const result = parseCustomRuleBatchImport({
       text: [
@@ -179,17 +178,6 @@ describe("public rule and SSRF edge branch coverage", () => {
       duplicateCount: 2,
       canImport: false,
     });
-  });
-
-  it("classifies SSRF IP boundary values that exercise mapped IPv6 fallbacks", () => {
-    expect(isPrivateOrReservedIp("0.0.0.0")).toBe(true);
-    expect(isPrivateOrReservedIp("192.88.99.1")).toBe(true);
-    expect(isPrivateOrReservedIp("223.255.255.255")).toBe(false);
-    expect(isPrivateOrReservedIp("::ffff:0")).toBe(true);
-    expect(isPrivateOrReservedIp("::ffff:0:0:0")).toBe(true);
-    expect(isPrivateOrReservedIp("::ffff:0a00:0001")).toBe(true);
-    expect(isPrivateOrReservedIp("::ffff:0808:0808")).toBe(false);
-    expect(isPrivateOrReservedIp("fe7f::1")).toBe(true);
   });
 
   it("formats local CN candidates with controlled rule metadata and stable sort order", async () => {

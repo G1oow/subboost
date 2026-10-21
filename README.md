@@ -26,7 +26,7 @@
 
 ```
 worker/       Cloudflare Worker（后端 API + 管理端 SPA + 部署配置）
-packages/     共享包：core（解析/生成）、server-core（订阅/加密/SSRF）、ui（组件与主题）、config（tsconfig 等）
+packages/     共享包：core（解析/生成）、server-core（响应头与 UA）、ui（组件与主题）
 docs/         实施文档（Plan/Build）与贡献指南
 test/         回归测试与测试基础设施
 ```
@@ -71,7 +71,7 @@ npm run test:coverage       # 带覆盖率阈值的质量门
 
 ## 与上游 SubBoost 的关系
 
-本仓库派生自 [SubBoost/subboost](https://github.com/SubBoost/subboost)，只保留 Cloudflare Workers 精简形态所需的代码与测试；上游的 Next.js + PostgreSQL 自托管形态（`local/`）、Docker 发布管线等不在本仓库范围内。共享包（`packages/`）沿用上游实现。
+本仓库派生自 [SubBoost/subboost](https://github.com/SubBoost/subboost)，只保留 Cloudflare Workers 精简形态所需的代码与测试；上游的 Next.js + PostgreSQL 自托管形态（`local/`）、Docker 发布管线等不在本仓库范围内。共享包（`packages/`）沿用上游实现，但只保留 Workers 形态实际引用到的模块，其余旧前端与 Node 服务端残留已移除。
 
 ## 许可证
 
