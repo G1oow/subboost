@@ -15,11 +15,8 @@
     "paths": {
       "@subboost/core": ["./packages/core/src/index.ts"],
       "@subboost/core/*": ["./packages/core/src/*"],
-      "@subboost/server-core": ["./packages/server-core/src/index.ts"],
       "@subboost/server-core/*": ["./packages/server-core/src/*"],
-      "@subboost/ui": ["./packages/ui/src/index.ts"],
-      "@subboost/ui/*": ["./packages/ui/src/*"],
-      "@subboost/config/*": ["./packages/config/*"]
+      "@subboost/ui/*": ["./packages/ui/src/*"]
     },
     "target": "ES2017"
   },

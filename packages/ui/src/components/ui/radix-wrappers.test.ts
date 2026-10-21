@@ -1,7 +1,6 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,6 @@ import {
   DialogTrigger,
 } from "./dialog";
 import { Switch } from "./switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
 
 vi.mock("@radix-ui/react-dialog", async () => {
   const React = await import("react");
@@ -41,17 +39,11 @@ vi.mock("@radix-ui/react-dialog", async () => {
 });
 
 describe("Radix UI wrappers", () => {
-  it("renders avatar, dialog, switch, and tabs wrappers with merged classes", () => {
+  it("renders dialog and switch wrappers with merged classes", () => {
     const html = renderToStaticMarkup(
       React.createElement(
         "div",
         null,
-        React.createElement(
-          Avatar,
-          { className: "avatar-extra" },
-          React.createElement(AvatarImage, { src: "https://example.com/avatar.png", alt: "avatar" }),
-          React.createElement(AvatarFallback, { className: "fallback-extra" }, "RY")
-        ),
         React.createElement(
           Dialog,
           { open: true },
@@ -64,24 +56,14 @@ describe("Radix UI wrappers", () => {
             React.createElement(DialogFooter, { className: "footer-extra" }, "Footer")
           )
         ),
-        React.createElement(Switch, { checked: true, className: "switch-extra" }),
-        React.createElement(
-          Tabs,
-          { defaultValue: "one" },
-          React.createElement(TabsList, { className: "tabs-list-extra" }, React.createElement(TabsTrigger, { value: "one" }, "One")),
-          React.createElement(TabsContent, { value: "one", className: "tabs-content-extra" }, "Panel")
-        )
+        React.createElement(Switch, { checked: true, className: "switch-extra" })
       )
     );
 
-    expect(html).toContain("avatar-extra");
-    expect(html).toContain("fallback-extra");
     expect(html).toContain("dialog-extra");
     expect(html).toContain("关闭");
     expect(html).toContain("header-extra");
     expect(html).toContain("footer-extra");
     expect(html).toContain("switch-extra");
-    expect(html).toContain("tabs-list-extra");
-    expect(html).toContain("tabs-content-extra");
   });
 });

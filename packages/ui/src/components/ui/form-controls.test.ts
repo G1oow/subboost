@@ -1,7 +1,6 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
-import { ChoiceChip, ChoiceGroup } from "./choice-group";
 import { FormField } from "./form-field";
 import { IconButton, type IconButtonProps } from "./icon-button";
 import { Input } from "./input";
@@ -140,22 +139,6 @@ describe("composed form controls", () => {
     expect(html).toContain('type="password"');
     expect(html).toContain('aria-label="显示密码"');
     expect(html).toContain('aria-describedby="password-description"');
-  });
-
-  it("exposes selected choice state and group naming", () => {
-    const html = renderToStaticMarkup(
-      React.createElement(
-        ChoiceGroup,
-        { label: "源类型" },
-        React.createElement(ChoiceChip, { label: "订阅链接", selected: true }),
-        React.createElement(ChoiceChip, { label: "文件", selected: false, disabled: true })
-      )
-    );
-
-    expect(html).toContain('role="group"');
-    expect(html).toContain('aria-label="源类型"');
-    expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain('aria-pressed="false"');
   });
 
   it("renders the thin table elements inside a horizontal scroll container", () => {

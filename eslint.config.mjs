@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTypescript from "eslint-config-next/typescript";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import reactHooks from "eslint-plugin-react-hooks";
+import tseslint from "typescript-eslint";
 
 const accessibilityRules = {
   "jsx-a11y/click-events-have-key-events": "error",
@@ -8,29 +9,18 @@ const accessibilityRules = {
   "jsx-a11y/no-static-element-interactions": "error",
 };
 
-const nextVitalsWithAccessibility = nextVitals.map((config) =>
-  config.name === "next"
-    ? {
-        ...config,
-        rules: {
-          ...config.rules,
-          ...accessibilityRules,
-        },
-      }
-    : config
-);
-
 export default defineConfig([
-  ...nextVitalsWithAccessibility,
-  ...nextTypescript,
+  ...tseslint.configs.recommended,
+  reactHooks.configs.flat["recommended-latest"],
+  jsxA11y.flatConfigs.recommended,
   {
     linterOptions: {
       reportUnusedDisableDirectives: "off",
     },
     rules: {
+      ...accessibilityRules,
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
-      "@next/next/no-html-link-for-pages": "off",
       "react-hooks/immutability": "off",
       "react-hooks/purity": "off",
       "react-hooks/preserve-manual-memoization": "off",

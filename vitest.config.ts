@@ -41,7 +41,6 @@ export default defineConfig({
       "@subboost/core": path.resolve(__dirname, "packages/core/src"),
       "@subboost/server-core": path.resolve(__dirname, "packages/server-core/src"),
       "@subboost/ui": path.resolve(__dirname, "packages/ui/src"),
-      "@subboost/config": path.resolve(__dirname, "packages/config"),
     },
   },
 });

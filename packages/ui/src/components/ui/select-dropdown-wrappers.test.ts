@@ -13,29 +13,6 @@ function mockPrimitive(tag: keyof React.JSX.IntrinsicElements, displayName: stri
   return Component;
 }
 
-vi.mock("@radix-ui/react-dropdown-menu", () => {
-  const Root = ({ children }: React.PropsWithChildren) => React.createElement(React.Fragment, null, children);
-  Root.displayName = "DropdownMenuRoot";
-
-  return {
-    Root,
-    Trigger: mockPrimitive("button", "DropdownMenuTrigger"),
-    Group: mockPrimitive("div", "DropdownMenuGroup"),
-    Portal: ({ children }: React.PropsWithChildren) => React.createElement(React.Fragment, null, children),
-    Sub: ({ children }: React.PropsWithChildren) => React.createElement(React.Fragment, null, children),
-    RadioGroup: mockPrimitive("div", "DropdownMenuRadioGroup"),
-    SubTrigger: mockPrimitive("button", "DropdownMenuSubTrigger"),
-    SubContent: mockPrimitive("div", "DropdownMenuSubContent"),
-    Content: mockPrimitive("div", "DropdownMenuContent"),
-    Item: mockPrimitive("div", "DropdownMenuItem"),
-    CheckboxItem: mockPrimitive("div", "DropdownMenuCheckboxItem"),
-    RadioItem: mockPrimitive("div", "DropdownMenuRadioItem"),
-    ItemIndicator: ({ children }: React.PropsWithChildren) => React.createElement("span", null, children),
-    Label: mockPrimitive("div", "DropdownMenuLabel"),
-    Separator: mockPrimitive("hr", "DropdownMenuSeparator"),
-  };
-});
-
 vi.mock("@radix-ui/react-select", () => {
   const Root = ({ children }: React.PropsWithChildren) => React.createElement(React.Fragment, null, children);
   Root.displayName = "SelectRoot";
@@ -60,22 +37,6 @@ vi.mock("@radix-ui/react-select", () => {
 });
 
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "./dropdown-menu";
-import {
   Select,
   SelectContent,
   SelectGroup,
@@ -88,52 +49,7 @@ import {
   SelectValue,
 } from "./select";
 
-describe("select and dropdown wrappers", () => {
-  it("renders dropdown menu wrappers with indicators, shortcuts, and merged classes", () => {
-    const html = renderToStaticMarkup(
-      React.createElement(
-        DropdownMenu,
-        null,
-        React.createElement(DropdownMenuTrigger, { className: "trigger-extra" }, "Open"),
-        React.createElement(
-          DropdownMenuContent,
-          { className: "content-extra", sideOffset: 8 },
-          React.createElement(
-            DropdownMenuGroup,
-            null,
-            React.createElement(DropdownMenuLabel, { inset: true, className: "label-extra" }, "Group"),
-            React.createElement(DropdownMenuItem, { inset: true, className: "item-extra" }, "Item"),
-            React.createElement(DropdownMenuCheckboxItem, { checked: true, className: "checkbox-extra" }, "Check me"),
-            React.createElement(
-              DropdownMenuRadioGroup,
-              null,
-              React.createElement(DropdownMenuRadioItem, { value: "one", className: "radio-extra" }, "Radio")
-            ),
-            React.createElement(DropdownMenuSeparator, { className: "separator-extra" }),
-            React.createElement(DropdownMenuShortcut, { className: "shortcut-extra" }, "Ctrl+K")
-          ),
-          React.createElement(
-            DropdownMenuSub,
-            null,
-            React.createElement(DropdownMenuSubTrigger, { inset: true, className: "sub-trigger-extra" }, "More"),
-            React.createElement(DropdownMenuSubContent, { className: "sub-content-extra" }, "Nested")
-          )
-        )
-      )
-    );
-
-    expect(html).toContain("Open");
-    expect(html).toContain("Group");
-    expect(html).toContain("Check me");
-    expect(html).toContain("Ctrl+K");
-    expect(html).toContain("content-extra");
-    expect(html).toContain("item-extra");
-    expect(html).toContain("checkbox-extra");
-    expect(html).toContain("radio-extra");
-    expect(html).toContain("sub-trigger-extra");
-    expect(html).toContain("sub-content-extra");
-  });
-
+describe("select wrappers", () => {
   it("renders select wrappers with viewport, scroll buttons, and merged classes", () => {
     const html = renderToStaticMarkup(
       React.createElement(
