@@ -5,15 +5,19 @@ import { requireAdmin } from "./auth";
 import { ApiError, BODY_LIMITS } from "./errors";
 import { error, json, readJsonBody, withSecurityHeaders } from "./http";
 import { getOrGenerateSubscription, refreshAll, type PipelineDeps } from "./pipeline";
+import { buildDashboardStats } from "./dashboard";
+import { collectNodeSummaries, countRenamedNodes, sanitizeNodeRenames } from "./node-renames";
 import { resolveDefaultUserAgent } from "./sources";
 import { validatePublicHttpUrl } from "./ssrf";
 import { createStore } from "./store";
 import {
   MAX_MANUAL_TEXT_BYTES,
+  MAX_PARSE_ERRORS,
   MAX_SOURCE_NAME_LENGTH,
   MAX_SOURCES,
   MAX_SUBSCRIPTIONS,
   MAX_USER_AGENT_LENGTH,
+  type SnapshotRecord,
   type SourceInput,
 } from "./types";
 
@@ -97,6 +101,7 @@ async function validateSources(input: unknown): Promise<SourceInput[]> {
       );
     }
 
+    const nodeRenames = sanitizeNodeRenames(item.nodeRenames);
     if (kind === "remote") {
       const url = stringField(item.url).trim();
       const validation = validatePublicHttpUrl(url);
@@ -110,6 +115,7 @@ async function validateSources(input: unknown): Promise<SourceInput[]> {
         url,
         enabled: item.enabled !== false,
         ...(userAgent ? { userAgent } : {}),
+        ...(nodeRenames ? { nodeRenames } : {}),
       });
       continue;
     }
@@ -136,6 +142,7 @@ async function validateSources(input: unknown): Promise<SourceInput[]> {
       manualText,
       enabled: item.enabled !== false,
       ...(userAgent ? { userAgent } : {}),
+      ...(nodeRenames ? { nodeRenames } : {}),
     });
   }
 
@@ -186,6 +193,93 @@ async function handleApi(request: Request, env: Env, deps: RouterDeps): Promise<
     return json({ sources });
   }
 
+  if (path === "/api/dashboard" && method === "GET") {
+    const [sources, subscriptions, status] = await Promise.all([
+      store.listSources(),
+      store.listSubscriptions(url.origin),
+      store.getStatus(),
+    ]);
+    const snapshots = new Map<string, SnapshotRecord | null>();
+    await Promise.all(
+      sources.map(async (source) => {
+        snapshots.set(source.id, await store.getSnapshot(source.id));
+      })
+    );
+    return json(
+      buildDashboardStats({
+        sources,
+        subscriptions,
+        status,
+        snapshots,
+        generatedAt: pipelineDeps.now().toISOString(),
+      })
+    );
+  }
+
+  // 解析一段节点文本，供「导入节点」时预览名称与协议
+  if (path === "/api/nodes/parse" && method === "POST") {
+    const body = requireObjectBody(await readJsonBody(request, BODY_LIMITS.large));
+    const text = stringField(body.text);
+    if (new TextEncoder().encode(text).byteLength > MAX_MANUAL_TEXT_BYTES) {
+      throw new ApiError(400, "VALIDATION_ERROR", "节点文本超过 512 KiB");
+    }
+    if (!text.trim()) {
+      return json({ nodes: [], totalParsed: 0, totalFailed: 0, errors: [] });
+    }
+    let parsed;
+    try {
+      parsed = parseSubscription(text);
+    } catch (err) {
+      const errorName = err instanceof Error ? err.name : "Error";
+      throw new ApiError(400, "VALIDATION_ERROR", `解析失败: ${errorName}`);
+    }
+    return json({
+      nodes: collectNodeSummaries(parsed.nodes, sanitizeNodeRenames(body.renames)),
+      totalParsed: parsed.totalParsed,
+      totalFailed: parsed.totalFailed,
+      errors: parsed.errors.slice(0, MAX_PARSE_ERRORS),
+    });
+  }
+
+  // 某个源当前的节点列表（含已应用的重命名），用于节点改名与仪表板
+  const sourceNodesMatch = /^\/api\/sources\/([^/]+)\/nodes$/.exec(path);
+  if (sourceNodesMatch && method === "GET") {
+    const sourceId = decodeURIComponent(sourceNodesMatch[1]);
+    const sources = await store.listSources();
+    const source = sources.find((item) => item.id === sourceId);
+    if (!source) throw new ApiError(404, "NOT_FOUND", "源不存在");
+
+    const snapshot = await store.getSnapshot(source.id);
+    let nodes = snapshot?.nodes ?? [];
+    let parseErrors = snapshot?.parseErrors ?? [];
+    // 手动源还没快照时直接解析文本，编辑改名时也能立刻看到节点
+    if (!snapshot && source.kind === "manual") {
+      try {
+        const parsed = parseSubscription(source.manualText ?? "");
+        nodes = parsed.nodes;
+        parseErrors = parsed.errors.slice(0, MAX_PARSE_ERRORS);
+      } catch {
+        nodes = [];
+        parseErrors = [];
+      }
+    }
+
+    return json({
+      source: {
+        id: source.id,
+        name: source.name,
+        kind: source.kind,
+        enabled: source.enabled,
+        nodeRenames: source.nodeRenames ?? {},
+      },
+      fetchedAt: snapshot?.fetchedAt ?? null,
+      nodeCount: nodes.length,
+      renamedCount: countRenamedNodes(nodes, source.nodeRenames),
+      nodes: collectNodeSummaries(nodes, source.nodeRenames),
+      parseErrors,
+    });
+  }
+
   if (path === "/api/config" && method === "PUT") {
     const body = await readJsonBody(request, BODY_LIMITS.large);
     const config = requireObjectBody(body);
@@ -233,9 +327,45 @@ async function handleApi(request: Request, env: Env, deps: RouterDeps): Promise<
     return json({ subscription });
   }
 
-  const deleteMatch = /^\/api\/subscriptions\/([^/]+)$/.exec(path);
-  if (deleteMatch && method === "DELETE") {
-    const deleted = await store.deleteSubscription(decodeURIComponent(deleteMatch[1]));
+  const subscriptionIdMatch = /^\/api\/subscriptions\/([^/]+)$/.exec(path);
+
+  // 随时修改订阅的名称与所含源；链接不变，但会丢弃旧缓存以便按新源重新生成
+  if (subscriptionIdMatch && method === "PATCH") {
+    const id = decodeURIComponent(subscriptionIdMatch[1]);
+    const body = requireObjectBody(await readJsonBody(request, BODY_LIMITS.small));
+    const patch: { name?: string; sourceIds?: string[] } = {};
+
+    if (body.name !== undefined) {
+      const name = stringField(body.name).trim();
+      if (name.length < 1 || name.length > SUBSCRIPTION_NAME_MAX_LENGTH) {
+        throw new ApiError(400, "VALIDATION_ERROR", "订阅名称长度必须在 1 到 80 字符之间");
+      }
+      patch.name = name;
+    }
+
+    if (body.sourceIds !== undefined) {
+      if (!Array.isArray(body.sourceIds)) {
+        throw new ApiError(400, "VALIDATION_ERROR", "sourceIds 必须是数组");
+      }
+      const sourceIds = [
+        ...new Set(body.sourceIds.filter((value): value is string => typeof value === "string")),
+      ];
+      const sources = await store.listSources();
+      const known = new Set(sources.map((source) => source.id));
+      const unknown = sourceIds.filter((sourceId) => !known.has(sourceId));
+      if (unknown.length > 0) {
+        throw new ApiError(400, "VALIDATION_ERROR", `源不存在：${unknown.slice(0, 3).join("、")}`);
+      }
+      patch.sourceIds = sourceIds;
+    }
+
+    const subscription = await store.updateSubscription(id, patch, url.origin);
+    if (!subscription) throw new ApiError(404, "NOT_FOUND", "订阅不存在");
+    return json({ subscription });
+  }
+
+  if (subscriptionIdMatch && method === "DELETE") {
+    const deleted = await store.deleteSubscription(decodeURIComponent(subscriptionIdMatch[1]));
     if (!deleted) throw new ApiError(404, "NOT_FOUND", "订阅不存在");
     return withSecurityHeaders(new Response(null, { status: 204 }));
   }

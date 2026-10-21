@@ -1,8 +1,10 @@
 import { readApiErrorMessage } from "@subboost/ui/lib/utils";
 
+export type ApiMethod = "GET" | "PUT" | "POST" | "PATCH" | "DELETE";
+
 export type ApiClient = {
   get<T>(path: string): Promise<T>;
-  send<T>(method: "PUT" | "POST" | "DELETE", path: string, body?: unknown): Promise<T>;
+  send<T>(method: Exclude<ApiMethod, "GET">, path: string, body?: unknown): Promise<T>;
 };
 
 export type ApiClientOptions = {
@@ -41,7 +43,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     get<T>(path: string) {
       return request<T>("GET", path);
     },
-    send<T>(method: "PUT" | "POST" | "DELETE", path: string, body?: unknown) {
+    send<T>(method: Exclude<ApiMethod, "GET">, path: string, body?: unknown) {
       return request<T>(method, path, body);
     },
   };

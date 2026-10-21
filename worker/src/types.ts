@@ -17,6 +17,9 @@ export const TTL_LOCK = 600; // 10 分钟
 export const MAX_SOURCES = 50;
 export const MAX_SUBSCRIPTIONS = 20;
 export const MAX_SOURCE_NAME_LENGTH = 80;
+export const MAX_NODE_NAME_LENGTH = 120;
+export const MAX_NODE_RENAMES = 4000;
+export const MAX_PREVIEW_NODES = 500;
 export const MAX_USER_AGENT_LENGTH = 200;
 export const MAX_MANUAL_TEXT_BYTES = 512 * 1024;
 export const MAX_PARSE_ERRORS = 20;
@@ -34,6 +37,8 @@ export type SourceInput = {
   manualText?: string;
   enabled?: boolean;
   userAgent?: string;
+  // 节点显示名覆盖表（key 见 nodeRenameKey）
+  nodeRenames?: NodeRenames;
 };
 
 export type SourceDto = {
@@ -44,6 +49,7 @@ export type SourceDto = {
   manualText?: string;
   enabled: boolean;
   userAgent?: string;
+  nodeRenames?: NodeRenames;
   createdAt: string;
   updatedAt: string;
 };
@@ -55,6 +61,7 @@ export type StoredSource = {
   payloadEnc: string;
   enabled: boolean;
   userAgent?: string;
+  nodeRenames?: NodeRenames;
   createdAt: string;
   updatedAt: string;
 };
@@ -115,5 +122,24 @@ export type StatusRecord = {
   durationMs: number;
   sources: SourceRefreshStatus[];
   subscriptions: SubscriptionRefreshStatus[];
+};
+
+/**
+ * 节点显示名覆盖表：key 由 nodeRenameKey(node) 生成（节点内容指纹，不含名称），
+ * value 是用户为这个节点设置的显示名。保存后立即作用于订阅生成与节点列表。
+ */
+export type NodeRenames = Record<string, string>;
+
+export type NodeSummary = {
+  // 稳定的节点标识（内容指纹哈希），供前端回写重命名映射
+  key: string;
+  // 最终展示名（已应用重命名）
+  name: string;
+  // 解析出来的原始名称（未应用重命名）
+  originName: string;
+  type: string;
+  server?: string;
+  port?: number;
+  renamed: boolean;
 };
 

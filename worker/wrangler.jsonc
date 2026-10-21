@@ -1,7 +1,7 @@
 {
   // Cloudflare Worker Lite：仅依赖 Workers + KV 的精简部署形态
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "subboost-worker-lite",
+  "name": "subboost",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],

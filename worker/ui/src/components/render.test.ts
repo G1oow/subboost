@@ -3,11 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./app-shell";
 import { ConfigPanel } from "./config-panel";
+import { DashboardPanel } from "./dashboard-panel";
+import { NodeRenameEditor } from "./node-rename-editor";
 import { SourcesPanel } from "./sources-panel";
 import { StatusPanel } from "./status-panel";
 import { SubscriptionsPanel } from "./subscriptions-panel";
 import { TokenGate } from "./token-gate";
-import type { AppState } from "../lib/types";
+import type { AppState, DashboardStats } from "../lib/types";
 
 const STATE: AppState = {
   app: { name: "SubBoost Lite", version: "0.1.0" },
@@ -129,3 +131,113 @@ describe("admin UI rendering", () => {
   });
 });
 
+const STATS: DashboardStats = {
+  generatedAt: "2026-10-12T00:00:00.000Z",
+  sources: { total: 2, enabled: 1, remote: 1, manual: 1 },
+  subscriptions: { total: 1, allSources: 1, scoped: 0 },
+  nodes: {
+    total: 12,
+    renamed: 2,
+    protocols: [
+      { type: "ss", count: 8 },
+      { type: "vless", count: 4 },
+    ],
+  },
+  sourceStats: [
+    {
+      sourceId: "s1",
+      name: "机场 A",
+      kind: "remote",
+      enabled: true,
+      nodeCount: 12,
+      renamedCount: 2,
+      fetchedAt: "2026-10-12T00:00:00.000Z",
+      ok: true,
+      protocols: [{ type: "ss", count: 8 }],
+    },
+    {
+      sourceId: "s2",
+      name: "手动节点",
+      kind: "manual",
+      enabled: false,
+      nodeCount: 0,
+      renamedCount: 0,
+      fetchedAt: null,
+      ok: null,
+      protocols: [],
+    },
+  ],
+  lastRun: {
+    at: "2026-10-12T00:00:00.000Z",
+    trigger: "cron",
+    durationMs: 1234,
+    sourceOk: 1,
+    sourceFailed: 0,
+    subscriptionOk: 1,
+    subscriptionFailed: 0,
+  },
+  warnings: [],
+};
+
+describe("dashboard and node rename rendering", () => {
+  it("renders the dashboard with stats, protocols and source health", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(DashboardPanel, {
+        state: STATE,
+        stats: STATS,
+        onRefresh: noopAsync,
+        onNavigate: () => {},
+      })
+    );
+    expect(html).toContain("最近刷新");
+    expect(html).toContain("协议分布");
+    expect(html).toContain("源健康");
+    expect(html).toContain("12");
+    expect(html).toContain("机场 A");
+    expect(html).toContain("运行正常");
+  });
+
+  it("falls back to the state data when dashboard stats are unavailable", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(DashboardPanel, {
+        state: STATE,
+        stats: null,
+        onRefresh: noopAsync,
+        onNavigate: () => {},
+      })
+    );
+    expect(html).toContain("源健康");
+    expect(html).toContain("机场 A");
+  });
+
+  it("renders parsed node names and protocols with rename inputs", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(NodeRenameEditor, {
+        nodes: [
+          { key: "0123456789abcdef", name: "香港 01", originName: "香港 01", type: "ss", renamed: false },
+          { key: "fedcba9876543210", name: "日本 02", originName: "日本 02", type: "vless", renamed: false },
+        ],
+        renames: {},
+        onChange: () => {},
+      })
+    );
+    expect(html).toContain("共 2 个节点");
+    expect(html).toContain("香港 01");
+    expect(html).toContain("vless");
+    expect(html).toContain("重命名节点 香港 01");
+  });
+
+  it("marks renamed nodes in the editor", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(NodeRenameEditor, {
+        nodes: [
+          { key: "0123456789abcdef", name: "香港 01", originName: "香港 01", type: "ss", renamed: true },
+        ],
+        renames: { "0123456789abcdef": "HK-01" },
+        onChange: () => {},
+      })
+    );
+    expect(html).toContain("已改名 1 个");
+    expect(html).toContain("原名 香港 01");
+  });
+});

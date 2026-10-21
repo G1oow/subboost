@@ -82,6 +82,9 @@ export function createStore(env: Env) {
       ...(stored.kind === "remote" ? { url: payload } : { manualText: payload }),
       enabled: stored.enabled,
       ...(stored.userAgent ? { userAgent: stored.userAgent } : {}),
+      ...(stored.nodeRenames && Object.keys(stored.nodeRenames).length > 0
+        ? { nodeRenames: stored.nodeRenames }
+        : {}),
       createdAt: stored.createdAt,
       updatedAt: stored.updatedAt,
     };
@@ -107,6 +110,8 @@ export function createStore(env: Env) {
       const id = previous?.id ?? randomId();
       nextIds.add(id);
       const payload = input.kind === "remote" ? input.url ?? "" : input.manualText ?? "";
+      const nodeRenames =
+        input.nodeRenames && Object.keys(input.nodeRenames).length > 0 ? input.nodeRenames : undefined;
       stored.push({
         id,
         name: input.name,
@@ -114,6 +119,7 @@ export function createStore(env: Env) {
         payloadEnc: await encryptString(payload, secret),
         enabled: input.enabled ?? true,
         ...(input.userAgent ? { userAgent: input.userAgent } : {}),
+        ...(nodeRenames ? { nodeRenames } : {}),
         createdAt: previous?.createdAt ?? now,
         updatedAt: now,
       });
@@ -126,6 +132,16 @@ export function createStore(env: Env) {
       if (nextIds.has(item.id)) continue;
       try {
         await kv.delete(snapshotKey(item.id));
+      } catch {
+        // ignore
+      }
+    }
+
+    // 源集合或节点改名都会影响已生成的 YAML：清掉订阅缓存，下次访问重新生成
+    const subs = await listStoredSubscriptions();
+    for (const sub of subs) {
+      try {
+        await kv.delete(cacheKey(sub.id));
       } catch {
         // ignore
       }
@@ -232,6 +248,32 @@ export function createStore(env: Env) {
     return toSubscriptionDto(updated, origin);
   }
 
+  /**
+   * 更新订阅的名称与所含源。链接与 token 保持不变，
+   * 但源集合变化会改变生成的 YAML，因此必须清掉该订阅的缓存。
+   */
+  async function updateSubscription(
+    id: string,
+    patch: { name?: string; sourceIds?: string[] },
+    origin: string
+  ): Promise<SubscriptionDto | null> {
+    const subs = await listStoredSubscriptions();
+    const index = subs.findIndex((item) => item.id === id);
+    if (index < 0) return null;
+
+    const previous = subs[index];
+    const updated: StoredSubscription = {
+      ...previous,
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.sourceIds !== undefined ? { sourceIds: patch.sourceIds } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    subs[index] = updated;
+    await writeSubscriptions(subs);
+    await kv.delete(cacheKey(id));
+    return toSubscriptionDto(updated, origin);
+  }
+
   async function findSubscriptionByToken(token: string): Promise<StoredSubscription | null> {
     const tokenHash = await sha256Hex(token);
     const id = await kv.get(tokenIndexKey(tokenHash), "text");
@@ -313,6 +355,7 @@ export function createStore(env: Env) {
     listSubscriptions,
     createSubscription,
     deleteSubscription,
+    updateSubscription,
     rotateSubscriptionToken,
     findSubscriptionByToken,
     getConfig,
