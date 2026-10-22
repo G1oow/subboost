@@ -1,27 +1,20 @@
 import { buildDefaultUserConfig } from "@subboost/core/config/defaults";
 import { decryptString, encryptString, generateToken, sha256Hex } from "./crypto";
 import { ApiError } from "./errors";
-import { newScriptShareCode, scriptByteLength } from "./scripts";
 import {
   KEY_CONFIG,
   KEY_LOCK,
-  KEY_SCRIPTS,
   KEY_SOURCES,
   KEY_STATUS,
   KEY_SUBS,
-  MAX_SCRIPTS,
   TTL_CACHE,
   TTL_LOCK,
   TTL_SNAPSHOT,
   type CacheRecord,
-  type ExtensionScriptDto,
-  type ExtensionScriptInput,
-  type ExtensionScriptPatch,
   type SnapshotRecord,
   type SourceDto,
   type SourceInput,
   type StatusRecord,
-  type StoredExtensionScript,
   type StoredSource,
   type StoredSubscription,
   type SubscriptionDto,
@@ -37,10 +30,6 @@ export function snapshotKey(sourceId: string): string {
 
 export function cacheKey(subscriptionId: string): string {
   return `cache:${subscriptionId}`;
-}
-
-export function scriptContentKey(scriptId: string): string {
-  return `script:${scriptId}`;
 }
 
 function randomId(): string {
@@ -310,165 +299,6 @@ export function createStore(env: Env) {
     await kv.delete(KEY_CONFIG);
   }
 
-  // ---------- 扩展脚本 ----------
-
-  function toScriptDto(stored: StoredExtensionScript, origin: string): ExtensionScriptDto {
-    return {
-      ...stored,
-      ...(stored.shareCode
-        ? {
-            shareUrl: `${origin}/s/${stored.shareCode}`,
-            sharePageUrl: `${origin}/#/share/${stored.shareCode}`,
-          }
-        : {}),
-    };
-  }
-
-  async function listStoredScripts(): Promise<StoredExtensionScript[]> {
-    return readJsonArray<StoredExtensionScript>(kv, KEY_SCRIPTS);
-  }
-
-  async function writeScripts(scripts: StoredExtensionScript[]): Promise<void> {
-    await kv.put(KEY_SCRIPTS, JSON.stringify(scripts));
-  }
-
-  async function listScripts(origin: string): Promise<ExtensionScriptDto[]> {
-    const stored = await listStoredScripts();
-    return stored.map((item) => toScriptDto(item, origin));
-  }
-
-  async function readScriptContent(scriptId: string): Promise<string | null> {
-    const secret = requireEncryptionKey(env);
-    const cipher = await kv.get(scriptContentKey(scriptId), "text");
-    if (!cipher) return null;
-    try {
-      return await decryptString(cipher, secret);
-    } catch {
-      throw new ApiError(
-        500,
-        "INTERNAL_ERROR",
-        "扩展脚本解密失败，请重新导入（ENCRYPTION_KEY 可能已更换）"
-      );
-    }
-  }
-
-  async function getScriptContent(scriptId: string): Promise<string | null> {
-    const stored = await listStoredScripts();
-    if (!stored.some((item) => item.id === scriptId)) return null;
-    return readScriptContent(scriptId);
-  }
-
-  async function createScript(
-    input: ExtensionScriptInput,
-    origin: string
-  ): Promise<ExtensionScriptDto> {
-    const secret = requireEncryptionKey(env);
-    const stored = await listStoredScripts();
-    if (stored.length >= MAX_SCRIPTS) {
-      throw new ApiError(400, "VALIDATION_ERROR", `最多允许 ${MAX_SCRIPTS} 个扩展脚本`);
-    }
-    const now = new Date().toISOString();
-    const record: StoredExtensionScript = {
-      id: randomId(),
-      name: input.name,
-      ...(input.description ? { description: input.description } : {}),
-      enabled: input.enabled ?? true,
-      size: scriptByteLength(input.content),
-      createdAt: now,
-      updatedAt: now,
-    };
-    // 正文单独存键并静态加密，元数据列表保持轻量
-    await kv.put(scriptContentKey(record.id), await encryptString(input.content, secret));
-    await writeScripts([...stored, record]);
-    return toScriptDto(record, origin);
-  }
-
-  async function updateScript(
-    id: string,
-    patch: ExtensionScriptPatch,
-    origin: string
-  ): Promise<ExtensionScriptDto | null> {
-    const secret = requireEncryptionKey(env);
-    const stored = await listStoredScripts();
-    const index = stored.findIndex((item) => item.id === id);
-    if (index < 0) return null;
-
-    if (patch.content !== undefined) {
-      await kv.put(scriptContentKey(id), await encryptString(patch.content, secret));
-    }
-    const updated: StoredExtensionScript = {
-      ...stored[index],
-      ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-      ...(patch.description !== undefined ? { description: patch.description } : {}),
-      ...(patch.content !== undefined ? { size: scriptByteLength(patch.content) } : {}),
-      updatedAt: new Date().toISOString(),
-    };
-    // 空描述按清空处理，避免存下无意义的空串
-    if (!updated.description) delete updated.description;
-
-    stored[index] = updated;
-    await writeScripts(stored);
-    return toScriptDto(updated, origin);
-  }
-
-  async function deleteScript(id: string): Promise<boolean> {
-    const stored = await listStoredScripts();
-    const next = stored.filter((item) => item.id !== id);
-    if (next.length === stored.length) return false;
-    await writeScripts(next);
-    await kv.delete(scriptContentKey(id));
-    return true;
-  }
-
-  /** 生成（或轮换）分享码：旧分享链接立即失效 */
-  async function enableScriptShare(
-    id: string,
-    origin: string
-  ): Promise<ExtensionScriptDto | null> {
-    const stored = await listStoredScripts();
-    const index = stored.findIndex((item) => item.id === id);
-    if (index < 0) return null;
-    const updated: StoredExtensionScript = {
-      ...stored[index],
-      shareCode: newScriptShareCode(),
-      updatedAt: new Date().toISOString(),
-    };
-    stored[index] = updated;
-    await writeScripts(stored);
-    return toScriptDto(updated, origin);
-  }
-
-  /** 关闭分享：清掉分享码，公开链接立即失效 */
-  async function disableScriptShare(
-    id: string,
-    origin: string
-  ): Promise<ExtensionScriptDto | null> {
-    const stored = await listStoredScripts();
-    const index = stored.findIndex((item) => item.id === id);
-    if (index < 0) return null;
-    const { shareCode: _shareCode, ...rest } = stored[index];
-    const updated: StoredExtensionScript = {
-      ...rest,
-      updatedAt: new Date().toISOString(),
-    };
-    stored[index] = updated;
-    await writeScripts(stored);
-    return toScriptDto(updated, origin);
-  }
-
-  /** 公开分享读取：未分享、已停用或分享码不存在都按不存在处理 */
-  async function findScriptByShareCode(
-    shareCode: string
-  ): Promise<{ script: ExtensionScriptDto; content: string } | null> {
-    const stored = await listStoredScripts();
-    const target = stored.find((item) => item.shareCode === shareCode);
-    if (!target || !target.enabled) return null;
-    const content = await readScriptContent(target.id);
-    if (content === null) return null;
-    return { script: toScriptDto(target, ""), content };
-  }
-
   async function getSnapshot(sourceId: string): Promise<SnapshotRecord | null> {
     return readJson<SnapshotRecord>(kv, snapshotKey(sourceId));
   }
@@ -531,14 +361,6 @@ export function createStore(env: Env) {
     getConfig,
     putConfig,
     resetConfig,
-    listScripts,
-    getScriptContent,
-    createScript,
-    updateScript,
-    deleteScript,
-    enableScriptShare,
-    disableScriptShare,
-    findScriptByShareCode,
     getSnapshot,
     putSnapshot,
     deleteSnapshot,

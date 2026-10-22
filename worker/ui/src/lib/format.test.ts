@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatBytes,
-  formatCount,
-  formatDateTime,
-  formatDuration,
-  formatPercent,
-  formatRelativeTime,
-} from "./format";
+import { formatCount, formatDateTime, formatDuration, formatPercent, formatRelativeTime } from "./format";
 
 const NOW = new Date("2026-10-12T12:00:00.000Z").getTime();
 
@@ -53,17 +46,5 @@ describe("formatDateTime", () => {
     expect(formatDateTime(null)).toBe("—");
     expect(formatDateTime("nope")).toBe("nope");
     expect(formatDateTime("2026-10-12T00:00:00.000Z")).toContain("2026");
-  });
-});
-
-describe("formatBytes", () => {
-  it("scales from bytes to mebibytes and guards invalid values", () => {
-    expect(formatBytes(undefined)).toBe("—");
-    expect(formatBytes(null)).toBe("—");
-    expect(formatBytes(-1)).toBe("—");
-    expect(formatBytes(Number.NaN)).toBe("—");
-    expect(formatBytes(512)).toBe("512 B");
-    expect(formatBytes(18291)).toBe("17.9 KiB");
-    expect(formatBytes(3 * 1024 * 1024)).toBe("3.0 MiB");
   });
 });
