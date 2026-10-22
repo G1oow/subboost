@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Activity, LayoutDashboard, Layers, Link2, Loader2, Settings } from "lucide-react";
+import { Activity, FileCode, LayoutDashboard, Layers, Link2, Loader2, Settings } from "lucide-react";
 import { ConfirmDialogHost } from "@subboost/ui/components/ui/confirm-dialog";
 import { useToast } from "@subboost/ui/components/ui/toaster";
 import { AppShell, type AppNavItem } from "./components/app-shell";
@@ -7,6 +7,8 @@ import { ConfigPanel } from "./components/config-panel";
 import { DashboardPanel } from "./components/dashboard-panel";
 import { SourcesPanel } from "./components/sources-panel";
 import { StatusPanel } from "./components/status-panel";
+import { ScriptsPanel, type ScriptImportInput, type ScriptUpdatePatch } from "./components/scripts-panel";
+import { ShareView, readShareCodeFromHash } from "./components/share-view";
 import { SubscriptionsPanel, type SubscriptionUpdatePatch } from "./components/subscriptions-panel";
 import { TokenGate } from "./components/token-gate";
 import { clearAdminToken, readAdminToken, writeAdminToken } from "./lib/admin-token";
@@ -14,8 +16,10 @@ import { createApiClient } from "./lib/api-client";
 import type {
   AppState,
   DashboardStats,
+  ExtensionScriptDto,
   PageId,
   ParseNodesResponse,
+  ScriptContentResponse,
   SourceInput,
   SourceNodesResponse,
   StatusRecord,
@@ -44,6 +48,7 @@ const NAV_ITEMS: AppNavItem[] = [
   { id: "dashboard", label: "仪表板", icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: "sources", label: "源管理", icon: <Layers className="h-4 w-4" /> },
   { id: "subscriptions", label: "订阅链接", icon: <Link2 className="h-4 w-4" /> },
+  { id: "scripts", label: "扩展脚本", icon: <FileCode className="h-4 w-4" /> },
   { id: "status", label: "刷新状态", icon: <Activity className="h-4 w-4" /> },
   { id: "config", label: "生成配置", icon: <Settings className="h-4 w-4" /> },
 ];
@@ -57,6 +62,9 @@ export function App() {
   const [loading, setLoading] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [page, setPage] = React.useState<PageId>(() => readPageFromHash());
+  const [shareCode, setShareCode] = React.useState<string | null>(() =>
+    typeof window === "undefined" ? null : readShareCodeFromHash(window.location.hash)
+  );
 
   const handleUnauthorized = React.useCallback(() => {
     clearAdminToken();
@@ -109,7 +117,10 @@ export function App() {
   // 用 hash 保存当前页面，刷新/前进后退都能回到同一页
   React.useEffect(() => {
     if (typeof window === "undefined") return;
-    const onHashChange = () => setPage(readPageFromHash());
+    const onHashChange = () => {
+      setShareCode(readShareCodeFromHash(window.location.hash));
+      setPage(readPageFromHash());
+    };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -230,6 +241,79 @@ export function App() {
     }
   };
 
+
+  const handleCreateScript = async (input: ScriptImportInput) => {
+    const result = await client.send<{ script: ExtensionScriptDto }>("POST", "/api/scripts", input);
+    setState((current) =>
+      current ? { ...current, scripts: [...current.scripts, result.script] } : current
+    );
+  };
+
+  const handleUpdateScript = async (id: string, patch: ScriptUpdatePatch) => {
+    const result = await client.send<{ script: ExtensionScriptDto }>(
+      "PATCH",
+      `/api/scripts/${encodeURIComponent(id)}`,
+      patch
+    );
+    setState((current) =>
+      current
+        ? {
+            ...current,
+            scripts: current.scripts.map((item) => (item.id === id ? result.script : item)),
+          }
+        : current
+    );
+  };
+
+  const handleDeleteScript = async (id: string) => {
+    await client.send<void>("DELETE", `/api/scripts/${encodeURIComponent(id)}`);
+    setState((current) =>
+      current ? { ...current, scripts: current.scripts.filter((item) => item.id !== id) } : current
+    );
+  };
+
+  const handleShareScript = async (id: string) => {
+    const result = await client.send<{ script: ExtensionScriptDto }>(
+      "POST",
+      `/api/scripts/${encodeURIComponent(id)}/share`
+    );
+    setState((current) =>
+      current
+        ? {
+            ...current,
+            scripts: current.scripts.map((item) => (item.id === id ? result.script : item)),
+          }
+        : current
+    );
+  };
+
+  const handleUnshareScript = async (id: string) => {
+    const result = await client.send<{ script: ExtensionScriptDto }>(
+      "DELETE",
+      `/api/scripts/${encodeURIComponent(id)}/share`
+    );
+    setState((current) =>
+      current
+        ? {
+            ...current,
+            scripts: current.scripts.map((item) => (item.id === id ? result.script : item)),
+          }
+        : current
+    );
+  };
+
+  const handleLoadScriptContent = React.useCallback(
+    async (id: string) => {
+      const result = await client.get<ScriptContentResponse>(
+        `/api/scripts/${encodeURIComponent(id)}/content`
+      );
+      return result.content;
+    },
+    [client]
+  );
+
+  // 分享页不需要 admin token，先于 token gate 判定
+  if (shareCode) return <ShareView code={shareCode} />;
   if (!token) return <TokenGate onAuthenticated={handleAuthenticated} />;
 
   const navItems = NAV_ITEMS.map((item) =>
@@ -237,7 +321,9 @@ export function App() {
       ? { ...item, badge: state.sources.length }
       : item.id === "subscriptions" && state
         ? { ...item, badge: state.subscriptions.length }
-        : item
+        : item.id === "scripts" && state
+          ? { ...item, badge: state.scripts.length }
+          : item
   );
 
   return (
@@ -294,6 +380,17 @@ export function App() {
                 onUpdate={handleUpdateSubscription}
                 onRotate={handleRotateSubscription}
                 onDelete={handleDeleteSubscription}
+              />
+            ) : null}
+            {page === "scripts" ? (
+              <ScriptsPanel
+                state={state}
+                onCreate={handleCreateScript}
+                onUpdate={handleUpdateScript}
+                onDelete={handleDeleteScript}
+                onShare={handleShareScript}
+                onUnshare={handleUnshareScript}
+                onLoadContent={handleLoadScriptContent}
               />
             ) : null}
             {page === "status" ? (
