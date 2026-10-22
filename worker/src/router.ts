@@ -7,12 +7,6 @@ import { error, json, readJsonBody, withSecurityHeaders } from "./http";
 import { getOrGenerateSubscription, refreshAll, type PipelineDeps } from "./pipeline";
 import { buildDashboardStats } from "./dashboard";
 import { collectNodeSummaries, countRenamedNodes, sanitizeNodeRenames } from "./node-renames";
-import {
-  normalizeShareCode,
-  parseScriptCreateInput,
-  parseScriptPatch,
-  scriptDownloadFileName,
-} from "./scripts";
 import { resolveDefaultUserAgent } from "./sources";
 import { validatePublicHttpUrl } from "./ssrf";
 import { createStore } from "./store";
@@ -23,7 +17,6 @@ import {
   MAX_SOURCES,
   MAX_SUBSCRIPTIONS,
   MAX_USER_AGENT_LENGTH,
-  type ExtensionScriptDto,
   type SnapshotRecord,
   type SourceInput,
 } from "./types";
@@ -66,15 +59,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function stringField(value: unknown): string {
   return typeof value === "string" ? value : "";
-}
-
-/** 路径参数解码：非法百分号编码按空值处理，避免 500 */
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return "";
-  }
 }
 
 async function validateSources(input: unknown): Promise<SourceInput[]> {
@@ -183,42 +167,19 @@ async function handleApi(request: Request, env: Env, deps: RouterDeps): Promise<
     return json({ ok: true });
   }
 
-  // 扩展脚本的公开分享：分享码即凭证，不要求 admin token
-  const publicScriptMatch = /^\/api\/share\/scripts\/([^/]+)$/.exec(path);
-  if (publicScriptMatch && method === "GET") {
-    const shareCode = normalizeShareCode(safeDecode(publicScriptMatch[1]));
-    const found = shareCode ? await store.findScriptByShareCode(shareCode) : null;
-    if (!found) throw new ApiError(404, "NOT_FOUND", "分享不存在");
-    return json(
-      {
-        script: {
-          name: found.script.name,
-          description: found.script.description ?? "",
-          content: found.content,
-          size: found.script.size,
-          updatedAt: found.script.updatedAt,
-        },
-      },
-      200,
-      { "x-robots-tag": "noindex" }
-    );
-  }
-
   await requireAdmin(request, env);
 
   if (path === "/api/state" && method === "GET") {
-    const [{ config, isDefault }, sources, subscriptions, scripts, status] = await Promise.all([
+    const [{ config, isDefault }, sources, subscriptions, status] = await Promise.all([
       store.getConfig(),
       store.listSources(),
       store.listSubscriptions(url.origin),
-      store.listScripts(url.origin),
       store.getStatus(),
     ]);
     return json({
       app: { name: appName(env), version: pkg.version },
       sources,
       subscriptions,
-      scripts,
       config,
       configIsDefault: isDefault,
       status,
@@ -330,51 +291,6 @@ async function handleApi(request: Request, env: Env, deps: RouterDeps): Promise<
     await store.resetConfig();
     const { config } = await store.getConfig();
     return json({ config, configIsDefault: true });
-  }
-
-  // ---------- 扩展脚本（管理端） ----------
-
-  if (path === "/api/scripts" && method === "POST") {
-    const body = requireObjectBody(await readJsonBody(request, BODY_LIMITS.large));
-    const script = await store.createScript(parseScriptCreateInput(body), url.origin);
-    return json({ script }, 201);
-  }
-
-  const scriptIdMatch = /^\/api\/scripts\/([^/]+)$/.exec(path);
-  if (scriptIdMatch && method === "PATCH") {
-    const id = safeDecode(scriptIdMatch[1]);
-    const body = requireObjectBody(await readJsonBody(request, BODY_LIMITS.large));
-    const script = await store.updateScript(id, parseScriptPatch(body), url.origin);
-    if (!script) throw new ApiError(404, "NOT_FOUND", "扩展脚本不存在");
-    return json({ script });
-  }
-
-  if (scriptIdMatch && method === "DELETE") {
-    const deleted = await store.deleteScript(safeDecode(scriptIdMatch[1]));
-    if (!deleted) throw new ApiError(404, "NOT_FOUND", "扩展脚本不存在");
-    return withSecurityHeaders(new Response(null, { status: 204 }));
-  }
-
-  const scriptContentMatch = /^\/api\/scripts\/([^/]+)\/content$/.exec(path);
-  if (scriptContentMatch && method === "GET") {
-    const content = await store.getScriptContent(safeDecode(scriptContentMatch[1]));
-    if (content === null) throw new ApiError(404, "NOT_FOUND", "扩展脚本不存在");
-    return json({ content });
-  }
-
-  // 生成分享码（已分享时等同轮换：旧链接立即失效）
-  const scriptShareMatch = /^\/api\/scripts\/([^/]+)\/share$/.exec(path);
-  if (scriptShareMatch && method === "POST") {
-    const script = await store.enableScriptShare(safeDecode(scriptShareMatch[1]), url.origin);
-    if (!script) throw new ApiError(404, "NOT_FOUND", "扩展脚本不存在");
-    return json({ script });
-  }
-
-  // 关闭分享：清掉分享码，公开链接立即 404
-  if (scriptShareMatch && method === "DELETE") {
-    const script = await store.disableScriptShare(safeDecode(scriptShareMatch[1]), url.origin);
-    if (!script) throw new ApiError(404, "NOT_FOUND", "扩展脚本不存在");
-    return json({ script });
   }
 
   if (path === "/api/subscriptions" && method === "POST") {
@@ -519,49 +435,6 @@ async function handleSubscription(
   return withSecurityHeaders(response);
 }
 
-/**
- * 扩展脚本的公开分享地址：分享码即凭证，客户端可直接拉取原文导入。
- * 非 200 响应与 /sub/* 一致，只回纯文本，不暴露内部状态。
- */
-async function handleScriptShare(
-  request: Request,
-  env: Env,
-  deps: RouterDeps,
-  rawCode: string
-): Promise<Response> {
-  const method = request.method.toUpperCase();
-  const isHead = method === "HEAD";
-  if (!isHead && method !== "GET") {
-    return textResponse("Method not allowed", 405, { allow: "GET, HEAD" });
-  }
-
-  const shareCode = normalizeShareCode(safeDecode(rawCode));
-  if (!shareCode) return textResponse("Not found", 404, undefined, isHead);
-
-  const store = buildPipelineDeps(env, deps).store;
-  let found: { script: ExtensionScriptDto; content: string } | null;
-  try {
-    found = await store.findScriptByShareCode(shareCode);
-  } catch {
-    return textResponse("Internal error", 500, undefined, isHead);
-  }
-  if (!found) return textResponse("Not found", 404, undefined, isHead);
-
-  const disposition =
-    new URL(request.url).searchParams.get("download") === "1" ? "attachment" : "inline";
-  const fileName = encodeURIComponent(scriptDownloadFileName(found.script.name));
-  return withSecurityHeaders(
-    new Response(isHead ? null : found.content, {
-      status: 200,
-      headers: {
-        "content-type": "text/plain;charset=utf-8",
-        "content-disposition": `${disposition}; filename*=UTF-8''${fileName}`,
-        "x-robots-tag": "noindex",
-      },
-    })
-  );
-}
-
 export async function route(
   request: Request,
   env: Env,
@@ -582,10 +455,6 @@ export async function route(
         return textResponse("Not found", 404, undefined, request.method.toUpperCase() === "HEAD");
       }
       return await handleSubscription(request, env, deps, token);
-    }
-
-    if (path.startsWith("/s/")) {
-      return await handleScriptShare(request, env, deps, path.slice("/s/".length));
     }
 
     if (path.startsWith("/api/")) {
