@@ -7,6 +7,7 @@ export const KEY_SUBS = "meta:subs";
 export const KEY_CONFIG = "meta:config";
 export const KEY_STATUS = "meta:status";
 export const KEY_LOCK = "meta:refresh-lock";
+export const KEY_SCRIPTS = "meta:scripts";
 
 // TTL（秒）
 export const TTL_SNAPSHOT = 604800; // 7 天
@@ -23,6 +24,11 @@ export const MAX_PREVIEW_NODES = 500;
 export const MAX_USER_AGENT_LENGTH = 200;
 export const MAX_MANUAL_TEXT_BYTES = 512 * 1024;
 export const MAX_PARSE_ERRORS = 20;
+// 扩展脚本：单个脚本正文上限 256 KiB，数量上限 20（KV 单值 25 MiB，正文单独存键）
+export const MAX_SCRIPTS = 20;
+export const MAX_SCRIPT_NAME_LENGTH = 80;
+export const MAX_SCRIPT_DESCRIPTION_LENGTH = 300;
+export const MAX_SCRIPT_BYTES = 256 * 1024;
 export const REFRESH_CONCURRENCY = 4;
 export const REFRESH_SOFT_DEADLINE_MS = 12 * 60 * 1000;
 
@@ -143,3 +149,40 @@ export type NodeSummary = {
   renamed: boolean;
 };
 
+
+// ---------- 扩展脚本（Clash Verge Rev 风格 main(config) 脚本） ----------
+
+/** 脚本正文单独存 KV（`script:<id>`），元数据列表只保存轻量字段 */
+export type StoredExtensionScript = {
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  /** 脚本正文的 UTF-8 字节数，供列表展示 */
+  size: number;
+  /** 公开分享码；为空表示未分享 */
+  shareCode?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ExtensionScriptDto = StoredExtensionScript & {
+  /** 原始脚本地址，客户端可直接拉取导入（仅已分享时存在） */
+  shareUrl?: string;
+  /** 面向人的分享页面地址（仅已分享时存在） */
+  sharePageUrl?: string;
+};
+
+export type ExtensionScriptInput = {
+  name: string;
+  description?: string;
+  content: string;
+  enabled?: boolean;
+};
+
+export type ExtensionScriptPatch = {
+  name?: string;
+  description?: string;
+  enabled?: boolean;
+  content?: string;
+};

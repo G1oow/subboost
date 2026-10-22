@@ -26,6 +26,36 @@ export type SubscriptionDto = {
   updatedAt: string;
 };
 
+/** 扩展脚本（Clash Verge Rev 风格 main(config) 脚本）元数据；正文按需单独拉取 */
+export type ExtensionScriptDto = {
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  /** 正文的 UTF-8 字节数 */
+  size: number;
+  /** 公开分享码；为空表示未分享 */
+  shareCode?: string;
+  /** 原始脚本地址，客户端可直接拉取导入 */
+  shareUrl?: string;
+  /** 面向人的分享页面地址 */
+  sharePageUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ScriptContentResponse = { content: string };
+
+/** 公开分享接口返回的脚本内容（无需 admin token） */
+export type SharedScriptResponse = {
+  script: {
+    name: string;
+    description: string;
+    content: string;
+    size: number;
+    updatedAt: string;
+  };
+};
 export type SourceRefreshStatus = {
   sourceId: string;
   ok: boolean;
@@ -52,6 +82,7 @@ export type AppState = {
   app: { name: string; version: string };
   sources: SourceDto[];
   subscriptions: SubscriptionDto[];
+  scripts: ExtensionScriptDto[];
   config: Record<string, unknown>;
   configIsDefault: boolean;
   status: StatusRecord | null;
@@ -142,4 +173,4 @@ export type DashboardStats = {
 };
 
 /** 管理页顶部导航的页面 id */
-export type PageId = "dashboard" | "sources" | "subscriptions" | "status" | "config";
+export type PageId = "dashboard" | "sources" | "subscriptions" | "scripts" | "status" | "config";

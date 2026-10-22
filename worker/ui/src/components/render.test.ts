@@ -8,6 +8,8 @@ import { NodeRenameEditor } from "./node-rename-editor";
 import { SourcesPanel } from "./sources-panel";
 import { SourceNodesInline } from "./source-nodes-inline";
 import { StatusPanel } from "./status-panel";
+import { ScriptsPanel } from "./scripts-panel";
+import { ShareView } from "./share-view";
 import { SubscriptionsPanel } from "./subscriptions-panel";
 import { TokenGate } from "./token-gate";
 import type { AppState, DashboardStats, SourceNodesResponse } from "../lib/types";
@@ -40,6 +42,28 @@ const STATE: AppState = {
       name: "默认订阅",
       sourceIds: [],
       link: "https://worker.example.com/sub/tokenvalue",
+      createdAt: "2026-10-01T00:00:00.000Z",
+      updatedAt: "2026-10-01T00:00:00.000Z",
+    },
+  ],
+  scripts: [
+    {
+      id: "sc1",
+      name: "Steam 直连",
+      description: "过滤高倍率节点",
+      enabled: true,
+      size: 18291,
+      shareCode: "abcdefghijklmnop",
+      shareUrl: "https://worker.example.com/s/abcdefghijklmnop",
+      sharePageUrl: "https://worker.example.com/#/share/abcdefghijklmnop",
+      createdAt: "2026-10-01T00:00:00.000Z",
+      updatedAt: "2026-10-01T00:00:00.000Z",
+    },
+    {
+      id: "sc2",
+      name: "未分享脚本",
+      enabled: false,
+      size: 2048,
       createdAt: "2026-10-01T00:00:00.000Z",
       updatedAt: "2026-10-01T00:00:00.000Z",
     },
@@ -129,6 +153,34 @@ describe("admin UI rendering", () => {
     expect(html).toContain("生成配置");
     expect(html).toContain("当前为默认配置");
     expect(html).toContain("mixedPort");
+  });
+
+  it("renders the scripts panel with share state and actions", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ScriptsPanel, {
+        state: STATE,
+        onCreate: noopAsync,
+        onUpdate: noopAsync,
+        onDelete: noopAsync,
+        onShare: noopAsync,
+        onUnshare: noopAsync,
+        onLoadContent: async () => "",
+      })
+    );
+    expect(html).toContain("扩展脚本");
+    expect(html).toContain("Steam 直连");
+    expect(html).toContain("已分享");
+    expect(html).toContain("未分享");
+    expect(html).toContain("https://worker.example.com/s/abcdefghijklmnop");
+  });
+
+  it("renders the public share view without requiring a token", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, { code: "abcdefghijklmnop" })
+    );
+    expect(html).toContain("扩展脚本分享");
+    expect(html).toContain("加载中");
+    expect(html).not.toContain("访问 token");
   });
 });
 

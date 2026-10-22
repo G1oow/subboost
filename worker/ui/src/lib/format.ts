@@ -41,3 +41,11 @@ export function formatCount(value: number): string {
   if (!Number.isFinite(value)) return "0";
   return value.toLocaleString("zh-CN");
 }
+
+/** 文件体积，用于扩展脚本正文大小展示 */
+export function formatBytes(bytes?: number | null): string {
+  if (bytes === undefined || bytes === null || !Number.isFinite(bytes) || bytes < 0) return "—";
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+}

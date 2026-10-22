@@ -179,6 +179,19 @@ Workers Builds 的 Build variables/secrets 只作用于构建阶段，不会注�
 - 本地 `npm run worker:deploy` 与 Workers Builds 部署的是同一个 Worker，两种方式可并存；同名 Worker 以后部署的为准，属正常覆盖行为。
 - 本地开发：`wrangler dev` 通过 `--config ../wrangler.jsonc` 读取根配置，`.dev.vars` 因此位于**仓库根目录**，`worker/.dev.vars` 不再被读取。
 
+## 扩展脚本分享
+
+管理页的「扩展脚本」页可以把 Clash Verge Rev 的扩展脚本（导出 `main(config)` 的 JS 文件）导入本实例，再生成一条公开分享链接，供其他设备拉取导入：
+
+- 导入：上传 `.js` / `.txt` 文件或直接粘贴内容，正文以 AES-256-GCM 静态加密存 KV（`script:<id>`），元数据存 `meta:scripts`；单脚本上限 256 KiB、最多 20 个，且必须包含 `main(config)` 入口。
+- 分享：`POST /api/scripts/<id>/share` 生成 256 bit 随机分享码，链接为 `https://<你的域名>/s/<分享码>`；再次调用等同轮换，旧链接立即失效。`DELETE /api/scripts/<id>/share` 关闭分享。
+- 拉取：`GET /s/<分享码>` 直接返回脚本文本（`text/plain`、`no-store`、`noindex`），加 `?download=1` 以附件形式下载 `*.js`；`GET /api/share/scripts/<分享码>` 返回带名称/描述/体积的 JSON，供分享页 `https://<你的域名>/#/share/<分享码>` 展示。
+- 停用或删除脚本、关闭分享后，公开链接立即返回 404；脚本正文不会出现在日志或错误信息中。
+
+公开分享依赖 `/s/*` 由 Worker 处理，`wrangler.jsonc` 的 `assets.run_worker_first` 已包含该前缀；改动这一项后需要重新部署才生效。
+
+注意：Workers 只负责存储与分发，不执行用户脚本；脚本在你自己的客户端里运行，导入前请确认来源可信。
+
 ## 说明
 
 - 节点解析与 YAML 生成复用 `@subboost/core`，输出与 `local/` 应用一致。
