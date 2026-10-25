@@ -1,5 +1,6 @@
 import * as React from "react";
-import { LogOut, Moon, RefreshCw, Sun, Zap } from "lucide-react";
+import { LogOut, Moon, RefreshCw, Sun } from "lucide-react";
+import { BrandMark } from "@subboost/ui/components/ui/brand-mark";
 import { Button } from "@subboost/ui/components/ui/button";
 import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { cn } from "@subboost/ui/lib/utils";
@@ -50,12 +51,7 @@ export function AppShell({
       <header className="sticky top-0 z-30 border-b border-ink/10 bg-header backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-indigo-500 text-btn-primary-fg shadow-(--btn-primary-shadow) transition-transform duration-300 hover:rotate-6"
-            >
-              <Zap className="h-4 w-4" />
-            </span>
+            <BrandMark className="h-9 w-9 shrink-0 shadow-(--btn-primary-shadow) transition-transform duration-300 hover:rotate-6" />
             <div className="flex items-baseline gap-2">
               <h1 className="text-lg font-semibold text-fg">{title}</h1>
               <span className="rounded-full border border-ink/10 bg-ink/5 px-2 py-0.5 text-[11px] text-fg-45">
