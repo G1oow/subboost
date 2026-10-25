@@ -12,7 +12,9 @@ export const SUBBOOST_THEME_COLOR = "#1e1b4b";
 
 export const SUBBOOST_ICON_PATH = "/icon.png";
 
-export const SUBBOOST_FAVICON_PATH = "/favicon.ico";
+export const SUBBOOST_FAVICON_PATH = "/favicon.svg";
+
+export const SUBBOOST_APPLE_TOUCH_ICON_PATH = "/apple-touch-icon.png";
 
 export const SUBBOOST_KEYWORDS = [
   "Clash",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createSubBoostManifest,
+  SUBBOOST_APPLE_TOUCH_ICON_PATH,
   SUBBOOST_FAVICON_PATH,
   SUBBOOST_FOOTER_DESCRIPTION,
   SUBBOOST_ICON_PATH,
@@ -20,7 +21,8 @@ describe("SubBoost brand constants", () => {
     expect(SUBBOOST_FOOTER_DESCRIPTION).toContain("配置");
     expect(SUBBOOST_THEME_COLOR).toMatch(/^#[0-9a-f]{6}$/i);
     expect(SUBBOOST_ICON_PATH).toBe("/icon.png");
-    expect(SUBBOOST_FAVICON_PATH).toBe("/favicon.ico");
+    expect(SUBBOOST_FAVICON_PATH).toBe("/favicon.svg");
+    expect(SUBBOOST_APPLE_TOUCH_ICON_PATH).toBe("/apple-touch-icon.png");
     expect(SUBBOOST_KEYWORDS).toContain("订阅转换");
     expect(SUBBOOST_MANIFEST_CATEGORIES).toEqual(["utilities", "productivity"]);
   });
