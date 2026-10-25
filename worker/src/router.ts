@@ -7,6 +7,7 @@ import { error, json, readJsonBody, withSecurityHeaders } from "./http";
 import { getOrGenerateSubscription, refreshAll, type PipelineDeps } from "./pipeline";
 import { buildDashboardStats } from "./dashboard";
 import { collectNodeSummaries, countRenamedNodes, sanitizeNodeRenames } from "./node-renames";
+import { fetchText } from "./safe-fetch";
 import { resolveDefaultUserAgent } from "./sources";
 import { validatePublicHttpUrl } from "./ssrf";
 import { createStore } from "./store";
@@ -38,15 +39,7 @@ function buildPipelineDeps(env: Env, overrides: RouterDeps): PipelineDeps {
   return (
     overrides.pipeline ?? {
       store: createStore(env),
-      fetchText: (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const response = await fetch(input, init);
-        return {
-          status: response.status,
-          headers: Object.fromEntries(response.headers.entries()),
-          text: await response.text(),
-          finalUrl: String(input),
-        };
-      }) as unknown as PipelineDeps["fetchText"],
+      fetchText,
       now,
       defaultUserAgent: resolveDefaultUserAgent(env),
     }

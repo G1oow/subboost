@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleRequest, handleScheduled } from "./index";
+import { buildWorkerDeps, handleRequest, handleScheduled } from "./index";
 import { createStore } from "./store";
 import { MemoryKV } from "./test-utils/memory-kv";
 import type { PipelineDeps } from "./pipeline";
@@ -85,5 +85,25 @@ describe("handleScheduled", () => {
     } as unknown as PipelineDeps;
 
     await expect(handleScheduled(env, { pipeline })).resolves.toBeUndefined();
+  });
+});
+
+describe("buildWorkerDeps", () => {
+  it("forwards the source user agent as a User-Agent header", async () => {
+    const { env } = createEnv();
+    const fetchSpy = vi.fn(async () => new Response("proxies: []", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy as unknown as typeof fetch);
+    try {
+      const deps = buildWorkerDeps(env);
+      expect(deps.pipeline).toBeDefined();
+      await deps.pipeline!.fetchText("https://subscription.example.com/sub", {
+        userAgent: "mihomo/1.19.24",
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const init = fetchSpy.mock.calls[0][1] as RequestInit;
+      expect(new Headers(init.headers).get("user-agent")).toBe("mihomo/1.19.24");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
