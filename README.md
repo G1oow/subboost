@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD033 MD041 -->
 <div align="center">
-  <p><img src="docs/assets/logo.png" alt="SubBoost Worker Lite" width="96"></p>
+  <p><img src="docs/assets/logo.svg" alt="SubBoost Worker Lite" width="96"></p>
   <h1>SubBoost Worker Lite</h1>
   <p>Cloudflare Workers + Workers KV 上的 Clash/Mihomo 订阅聚合与管理</p>
   <p>
