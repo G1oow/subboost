@@ -2,6 +2,7 @@ import { ApiError } from "./errors";
 import { error as apiErrorResponse } from "./http";
 import { refreshAll, type PipelineDeps } from "./pipeline";
 import { route, type RouterDeps } from "./router";
+import { fetchText } from "./safe-fetch";
 import { resolveDefaultUserAgent } from "./sources";
 import { createStore } from "./store";
 
@@ -14,17 +15,7 @@ export function buildWorkerDeps(env: Env, overrides: WorkerDeps = {}): RouterDep
 
   const pipeline: PipelineDeps = {
     store: createStore(env),
-    fetchText:
-      overrides.fetchText ??
-      ((async (input: RequestInfo | URL, init?: RequestInit) => {
-        const response = await fetch(input, init);
-        return {
-          status: response.status,
-          headers: Object.fromEntries(response.headers.entries()),
-          text: await response.text(),
-          finalUrl: String(input),
-        };
-      }) as unknown as PipelineDeps["fetchText"]),
+    fetchText: overrides.fetchText ?? fetchText,
     now: overrides.now ?? (() => new Date()),
     defaultUserAgent: resolveDefaultUserAgent(env),
   };
