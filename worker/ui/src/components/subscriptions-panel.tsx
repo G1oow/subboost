@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, Copy, Link2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Copy, Link2, Pencil, Plus, QrCode, RefreshCw, Trash2 } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@subboost/ui/components/ui/card";
@@ -19,6 +19,7 @@ import { useToast } from "@subboost/ui/components/ui/toaster";
 import { copyTextToClipboard } from "@subboost/ui/lib/clipboard";
 import { cn } from "@subboost/ui/lib/utils";
 import type { AppState, SubscriptionDto } from "../lib/types";
+import { SubscriptionShareDialog } from "./subscription-share-dialog";
 
 export type SubscriptionUpdatePatch = {
   name?: string;
@@ -49,6 +50,12 @@ export function SubscriptionsPanel({
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState("");
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [sharingId, setSharingId] = React.useState<string | null>(null);
+  // 由 id 派生而非保存快照，轮换/改名后弹窗自动跟着更新
+  const sharing = React.useMemo(
+    () => state.subscriptions.find((item) => item.id === sharingId) ?? null,
+    [state.subscriptions, sharingId]
+  );
 
   const sourceNameById = React.useMemo(
     () => new Map(state.sources.map((source) => [source.id, source.name])),
@@ -219,6 +226,13 @@ export function SubscriptionsPanel({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <IconButton
+                        label={`分享 ${subscription.name} 二维码`}
+                        variant="ghost"
+                        onClick={() => setSharingId(subscription.id)}
+                      >
+                        <QrCode aria-hidden="true" />
+                      </IconButton>
                       <IconButton label={`复制 ${subscription.name} 链接`} variant="ghost" onClick={() => handleCopy(subscription)}>
                         <Check
                           aria-hidden="true"
@@ -252,6 +266,8 @@ export function SubscriptionsPanel({
           </Table>
         )}
       </CardContent>
+
+      <SubscriptionShareDialog subscription={sharing} onClose={() => setSharingId(null)} />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">

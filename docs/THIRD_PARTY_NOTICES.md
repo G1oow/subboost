@@ -6,8 +6,8 @@ human-readable summary, not a full dependency license inventory.
 ## npm Dependencies
 
 The app depends on packages from the npm ecosystem, including Next.js, React,
-Prisma, Radix UI, lucide-react, js-yaml, Peggy, Tailwind CSS, Zustand, and
-related build/test tools. Their individual licenses are recorded in
+Prisma, Radix UI, lucide-react, qrcode.react (ISC), js-yaml, Peggy, Tailwind CSS,
+Zustand, and related build/test tools. Their individual licenses are recorded in
 `package-lock.json` and distributed with the package registry metadata.
 
 ## UI Components

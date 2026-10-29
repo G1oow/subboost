@@ -8,6 +8,7 @@ import { NodeRenameEditor } from "./node-rename-editor";
 import { SourcesPanel } from "./sources-panel";
 import { SourceNodesInline } from "./source-nodes-inline";
 import { StatusPanel } from "./status-panel";
+import { SubscriptionShareContent, SubscriptionShareDialog } from "./subscription-share-dialog";
 import { SubscriptionsPanel } from "./subscriptions-panel";
 import { TokenGate } from "./token-gate";
 import type { AppState, DashboardStats, SourceNodesResponse } from "../lib/types";
@@ -120,6 +121,29 @@ describe("admin UI rendering", () => {
     expect(html).toContain("订阅链接");
     expect(html).toContain("默认订阅");
     expect(html).toContain("https://worker.example.com/sub/tokenvalue");
+    expect(html).toContain("分享 默认订阅 二维码");
+  });
+
+  it("renders the share content with the link and security hint", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SubscriptionShareContent, { subscription: STATE.subscriptions[0] })
+    );
+    expect(html).toContain("默认订阅");
+    expect(html).toContain("https://worker.example.com/sub/tokenvalue");
+    expect(html).toContain("复制链接");
+    expect(html).toContain("保存二维码");
+    expect(html).toContain("打开链接");
+    expect(html).toContain("链接等同于访问凭据");
+    expect(html).toContain("<canvas");
+  });
+
+  it("keeps the share dialog closed until a subscription is selected", () => {
+    // Dialog 走 Portal，静态渲染下只验证关闭态不透传链接
+    const html = renderToStaticMarkup(
+      React.createElement(SubscriptionShareDialog, { subscription: null, onClose: () => {} })
+    );
+    expect(html).not.toContain("分享订阅");
+    expect(html).not.toContain("https://worker.example.com/sub/tokenvalue");
   });
 
   it("renders the config panel with the JSON text and default hint", () => {
