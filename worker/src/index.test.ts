@@ -91,8 +91,8 @@ describe("handleScheduled", () => {
 describe("buildWorkerDeps", () => {
   it("forwards the source user agent as a User-Agent header", async () => {
     const { env } = createEnv();
-    const fetchSpy = vi.fn(async () => new Response("proxies: []", { status: 200 }));
-    vi.stubGlobal("fetch", fetchSpy as unknown as typeof fetch);
+    const fetchSpy = vi.fn<typeof fetch>(async () => new Response("proxies: []", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
     try {
       const deps = buildWorkerDeps(env);
       expect(deps.pipeline).toBeDefined();
@@ -100,8 +100,8 @@ describe("buildWorkerDeps", () => {
         userAgent: "mihomo/1.19.24",
       });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      const init = fetchSpy.mock.calls[0][1] as RequestInit;
-      expect(new Headers(init.headers).get("user-agent")).toBe("mihomo/1.19.24");
+      const init = fetchSpy.mock.calls[0][1];
+      expect(new Headers(init?.headers).get("user-agent")).toBe("mihomo/1.19.24");
     } finally {
       vi.unstubAllGlobals();
     }
