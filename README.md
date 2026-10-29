@@ -13,6 +13,30 @@
 
 **SubBoost Worker Lite** 是 [SubBoost](https://github.com/SubBoost/subboost) 的精简部署形态：把几个上游订阅与手动节点聚合成一条 Clash/Mihomo 订阅链接，只依赖 Cloudflare Workers 与 Workers KV，不需要服务器、数据库或容器。适合个人使用、只想维护一条聚合链接的场景。
 
+## 界面预览
+
+仪表板（深色）：
+
+![仪表板（深色）](docs/assets/screenshot-dashboard-dark.png)
+
+订阅链接与二维码分享（深色）：
+
+| 订阅链接 | 二维码分享 |
+| --- | --- |
+| ![订阅链接（深色）](docs/assets/screenshot-subscriptions-dark.png) | ![二维码分享（深色）](docs/assets/screenshot-qr-share-dark.png) |
+
+仪表板与订阅链接（浅色）：
+
+| 仪表板 | 订阅链接 |
+| --- | --- |
+| ![仪表板（浅色）](docs/assets/screenshot-dashboard-light.png) | ![订阅链接（浅色）](docs/assets/screenshot-subscriptions-light.png) |
+
+源管理（深色）：
+
+![源管理（深色）](docs/assets/screenshot-sources-dark.png)
+
+> 截图取自本地 `wrangler dev` 实例，使用示例源与保留域名（`example.com`、RFC 5737 网段）演示数据，不含任何真实订阅或凭据。
+
 ## 特性
 
 - **订阅聚合**：导入多个上游订阅与手动节点（`ss://`、`vmess://`、`vless://`、`trojan://`、`hysteria2://` 等常见协议），跨源去重后生成一条订阅链接
