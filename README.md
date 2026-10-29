@@ -89,7 +89,7 @@ npm run worker:dev
 ADMIN_TOKEN=<32 位以上随机串> ENCRYPTION_KEY=<32 位以上随机串> npm run worker:deploy
 ```
 
-脚本会按标题 `SUBBOOST_KV` 复用已存在的 KV namespace，找不到就新建，然后把 id 注入临时配置完成部署。CI 场景（Workers Builds、Deploy to Cloudflare 按钮）用根级 `npm run deploy`，它在此基础上跳过 Secret 上传，运行时密钥改在 Dashboard 配置。上述方式的细节、fork 部署排错见 **[worker/README.md](worker/README.md)**。
+脚本会按标题 `SUBBOOST_KV` 复用已存在的 KV namespace，找不到就新建，然后把 id 注入临时配置完成部署。CI 场景（Workers Builds、Deploy to Cloudflare 按钮）用根级 `npm run deploy`，它在此基础上跳过 Secret 上传，运行时密钥改在 Dashboard 配置；已有 `SUBBOOST_KV_ID=<id> SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy` 这类显式指定 id 的命令效果等价，无需改动。上述方式的细节、fork 部署排错见 **[worker/README.md](worker/README.md)**。
 
 ## 常用命令
 
