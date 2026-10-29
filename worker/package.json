@@ -8,7 +8,7 @@
     "dev": "wrangler dev --config ../wrangler.jsonc",
     "dev:ui": "vite --config ui/vite.config.ts --configLoader runner",
     "build": "vite build --config ui/vite.config.ts --configLoader runner",
-    "deploy": "npm run build && wrangler deploy --config ../wrangler.jsonc",
+    "deploy": "npm run build && node ../scripts/deploy-worker.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p ui/tsconfig.json"
   },
   "dependencies": {

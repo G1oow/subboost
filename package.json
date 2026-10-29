@@ -16,12 +16,14 @@
     "test:unit": "vitest run",
     "test:coverage": "vitest run --config vitest.coverage.ts --coverage",
     "test:core": "vitest run --config vitest.core.config.ts",
-    "lint": "eslint packages worker --max-warnings=0 && npm run check:ui-consistency",
+    "lint": "eslint packages worker --max-warnings=0 && npm run check:ui-consistency && npm run check:repo-hygiene",
     "check:ui-consistency": "node scripts/check-ui-consistency.cjs packages worker",
+    "check:repo-hygiene": "node scripts/check-repo-hygiene.cjs",
     "worker:dev": "npm --workspace @subboost/worker run dev",
     "worker:dev:ui": "npm --workspace @subboost/worker run dev:ui",
     "worker:build": "npm --workspace @subboost/worker run build",
-    "worker:deploy": "npm --workspace @subboost/worker run deploy",
+    "worker:deploy": "npm run worker:build && node scripts/deploy-worker.cjs",
+    "worker:deploy:dry-run": "node scripts/deploy-worker.cjs --dry-run",
     "worker:typecheck": "npm --workspace @subboost/worker run typecheck"
   },
   "devDependencies": {

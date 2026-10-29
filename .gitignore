@@ -19,3 +19,5 @@ worker/.dev.vars
 worker/dist/
 .wrangler/
 .dev.vars
+# 部署脚本生成的临时配置（含真实 KV namespace id），禁止提交
+.wrangler.deploy.jsonc

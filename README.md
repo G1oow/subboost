@@ -73,16 +73,23 @@ npm run worker:build
 npm run worker:dev
 ```
 
-部署到 Cloudflare（创建 KV namespace、设置 secret、`wrangler deploy` 与部署后验证）见 **[worker/README.md](worker/README.md)**；同一文档也说明了通过 Cloudflare Workers Builds 连接 GitHub 自动部署的方式。
+部署到 Cloudflare 只需一条命令，脚本会自动建好 KV namespace 并绑定，密钥通过环境变量传入、不写入仓库：
+
+```bash
+ADMIN_TOKEN=<32 位以上随机串> ENCRYPTION_KEY=<32 位以上随机串> npm run worker:deploy
+```
+
+脚本会按标题 `SUBBOOST_KV` 复用已存在的 KV namespace，找不到就新建，然后把 id 注入临时配置完成部署（细节与其它方式见 **[worker/README.md](worker/README.md)**）。
 
 ## 常用命令
 
 ```bash
 npm run worker:dev          # 本地运行 Worker
 npm run worker:build        # 构建管理页到 worker/dist
-npm run worker:deploy       # 构建并部署到 Cloudflare
+npm run worker:deploy       # 构建 + 自动建/绑定 KV + 上传 Secret + 部署
+npm run worker:deploy:dry-run  # 只校验配置与绑定，不上传
 npm run worker:typecheck    # 类型检查
-npm run lint                # ESLint + UI 一致性检查
+npm run lint                # ESLint + UI 一致性检查 + 仓库卫生检查
 npm run test:unit           # 全量单元/回归测试
 npm run test:coverage       # 带覆盖率阈值的质量门
 ```
