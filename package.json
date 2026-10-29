@@ -10,8 +10,19 @@
     "packages/*",
     "worker"
   ],
+  "cloudflare": {
+    "bindings": {
+      "ADMIN_TOKEN": {
+        "description": "管理端访问 token，至少 32 位随机串。生成：`node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64url'))\"`"
+      },
+      "ENCRYPTION_KEY": {
+        "description": "KV 静态加密密钥（AES-256-GCM），至少 32 位随机串。生成：`node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64url'))\"`。更换后已有源与订阅无法解密，需要重新录入。"
+      }
+    }
+  },
   "scripts": {
     "build": "npm run worker:build",
+    "deploy": "SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy",
     "prepare": "npm run worker:build",
     "test:unit": "vitest run",
     "test:coverage": "vitest run --config vitest.coverage.ts --coverage",

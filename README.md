@@ -56,7 +56,17 @@ docs/         实施文档（Plan/Build）与贡献指南
 test/         回归测试与测试基础设施
 ```
 
-## 快速开始
+## 一键部署（fork 本仓库）
+
+<a href="https://deploy.workers.cloudflare.com/?url=https://github.com/G1oow/subboost"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare" height="32"></a>
+
+点按钮后用 GitHub 账号登录 Cloudflare：Cloudflare 会把本仓库复制到你自己的 GitHub 账号下（只复制，不改动上游仓库），新建一个名为 `subboost` 的 Worker。Workers Builds 复用根目录 `package.json` 的 `deploy` 脚本（`SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`），构建阶段由 `prepare` 自动生成管理页；`wrangler.jsonc` 里 KV namespace 只写了绑定名与占位符 id，Cloudflare 会按绑定名自动创建 KV 并替换配置里的 id。全程不需要手工建 KV，也不需要在本机登录 wrangler。
+
+一键部署的**唯一手工步骤**是填两个运行时 Secret。按钮页面会启动部署，之后在 Worker 的 Settings → Variables and Secrets 里添加 Secret 类型的 `ADMIN_TOKEN` 与 `ENCRYPTION_KEY`（各 32 位以上随机串，生成命令见 **[worker/README.md](worker/README.md)**）；这两项没配置前，管理接口按 fail closed 返回 503。
+
+不使用按钮、改为在自己 fork 出来的仓库里推送代码自动部署，或按钮部署后需要排错时，见 **[worker/README.md](worker/README.md)** 的「从 fork 仓库部署」章节。
+
+## 本地开发与命令行部署
 
 前置：Node 24.22.1+ 与 npm（版本见 `.nvmrc`，`nvm use` 可直接切换），本地运行不需要 Cloudflare 账号。
 
@@ -79,7 +89,7 @@ npm run worker:dev
 ADMIN_TOKEN=<32 位以上随机串> ENCRYPTION_KEY=<32 位以上随机串> npm run worker:deploy
 ```
 
-脚本会按标题 `SUBBOOST_KV` 复用已存在的 KV namespace，找不到就新建，然后把 id 注入临时配置完成部署（细节与其它方式见 **[worker/README.md](worker/README.md)**）。
+脚本会按标题 `SUBBOOST_KV` 复用已存在的 KV namespace，找不到就新建，然后把 id 注入临时配置完成部署。CI 场景（Workers Builds、Deploy to Cloudflare 按钮）用根级 `npm run deploy`，它在此基础上跳过 Secret 上传，运行时密钥改在 Dashboard 配置。上述方式的细节、fork 部署排错见 **[worker/README.md](worker/README.md)**。
 
 ## 常用命令
 
