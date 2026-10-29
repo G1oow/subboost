@@ -166,7 +166,7 @@ curl -s -D - "<订阅链接>" | head -20   # 200，头含 profile-update-interva
    - **Worker 名称**：默认取 `wrangler.jsonc` 的 `name`（`subboost`），可改；改名后 workers.dev 地址随之变化。
    - **KV namespace 名称**：默认 `SUBBOOST_KV`，Cloudflare 按绑定名自动创建，不需要预先存在。
 
-   构建/部署命令由 Cloudflare 从 `package.json` 自动识别并预填：Build command 留空（安装依赖时的 `prepare` 已构建管理页），Deploy command 为 `npm run deploy` —— 根 `package.json` 的 `deploy` 会跳过 Secret 上传（CI 里没有密钥），只用自动创建的 KV 完成部署。
+   构建/部署命令由 Cloudflare 从 `package.json` 自动识别并预填：Build command 留空（安装依赖时的 `prepare` 已构建管理页），Deploy command 为 `npm run deploy`。根 `package.json` 的 `deploy` 就是 `SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`，跳过 CI 里不存在的 Secret 上传，并让脚本按标题查找/创建 KV。
 3. 点 Deploy，等待 Workers Builds 完成构建。
 4. 部署完成后补两个运行时 Secret，见下方「部署后必须做的两步」。
 
@@ -185,14 +185,29 @@ curl -s -D - "<订阅链接>" | head -20   # 200，头含 profile-update-interva
 
 1. Workers & Pages → Create → Import a repository → 选择**你自己的 fork**，Production branch 填 `main`。
 2. Root directory 保持 `/`；Build command 留空（`prepare` 会自动构建管理页）。
-3. Deploy command 保持 `npm run deploy` 即可（等价于 `SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`）。仓库里的 `wrangler.jsonc` 只含 KV id 占位符，直接 `npx wrangler deploy` 会报 `KV namespace 'REPLACE_WITH_KV_NAMESPACE_ID' is not valid`；脚本会自己按标题 `SUBBOOST_KV` 查找/创建 KV 并注入 id，所以**不要**改回默认的 `npx wrangler deploy`。若想固定复用某个已存在的 KV，在 Build variables 里加 `SUBBOOST_KV_ID=<你的 KV id>`。
+3. Deploy command 保持 `npm run deploy` 即可。三种等价写法，任选其一都不需要再改：
+
+   ```bash
+   # 1) 根级脚本，脚本自己按标题 SUBBOOST_KV 查找，找不到就新建
+   npm run deploy
+
+   # 2) 显式指定 KV id，跳过查找与创建（复用已有 namespace 时推荐）
+   SUBBOOST_KV_ID=<你的 KV id> SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy
+
+   # 3) 把 SUBBOOST_KV_ID / SUBBOOST_SKIP_SECRETS 配成 Build variables
+   npm run worker:deploy
+   ```
+
+   `SUBBOOST_KV_ID` 存在时优先级最高：脚本直接注入该 id，不调用 `kv namespace list`，也不会新建 namespace。所以写了显式 id 的旧命令（方式 2）长期有效，不会被后来新增的 `npm run deploy` 取代。
+
+   三种写法的共同点：都经过 `node scripts/deploy-worker.cjs`，会生成注入好 id 的临时配置 `.wrangler.deploy.jsonc` 再部署。共同的红线是**不能**用默认的 `npx wrangler deploy` —— 它会读到占位符 id 并报 `KV namespace 'REPLACE_WITH_KV_NAMESPACE_ID' is not valid`。
 4. 在 Worker 的 Settings → Variables and Secrets 添加 `ADMIN_TOKEN`、`ENCRYPTION_KEY` 两个 Secret。
 5. 之后每次 push 到 `main` 自动构建部署；同步上游用 GitHub 的 Sync fork（或 `git pull upstream main`）后推送即可，KV 数据与 Secret 不受影响。
 
 ### fork 部署常见问题
 
-- **构建报了 KV id 无效**：Deploy command 被改成了 `npx wrangler deploy`。改回 `npm run deploy`；或在 Build variables 里配 `SUBBOOST_KV_ID=<你的 KV id>`（脚本会跳过查找与创建）。
-- **构建时提示密钥校验未通过**：Deploy command 被改成了 `npm run worker:deploy`，该命令要求 CI 里存在 `ADMIN_TOKEN` / `ENCRYPTION_KEY`。改用根级 `npm run deploy`（自带 `SUBBOOST_SKIP_SECRETS=1`），运行时密钥走 Dashboard 的 Worker Secret（见「运行时 Secret」）。
+- **构建报了 KV id 无效**：Deploy command 被改成了 `npx wrangler deploy`。改回 `npm run deploy`，或改用上面方式 2 的 `SUBBOOST_KV_ID=<你的 KV id> SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`。
+- **构建时提示密钥校验未通过**：Deploy command 里缺少 `SUBBOOST_SKIP_SECRETS=1`（例如直接写 `npm run worker:deploy`），而 CI 里没有 `ADMIN_TOKEN` / `ENCRYPTION_KEY`。加上该变量，或改用自带它的 `npm run deploy`；运行时密钥走 Dashboard 的 Worker Secret（见「运行时 Secret」）。
 - **管理页打开但接口全 503**：`ADMIN_TOKEN` / `ENCRYPTION_KEY` 只配在 Build variables 里。Build variables 只在构建阶段生效，运行时 Secret 必须在 Worker Settings 里另加。
 - **Node 版本过旧**：Workers Builds 构建镜像默认 Node 24.18.0，低于仓库 `.nvmrc` 要求的 24.22.1；Workers Builds 会自动识别 `.nvmrc` 覆盖，若构建日志显示的版本不符，可显式设置 `NODE_VERSION=24.22.1`。
 - **改了 Worker 名称**：`wrangler.jsonc` 的 `name` 与 Dashboard 里的项目名以后部署的为准；改名等于换了一个 workers.dev 域名，原订阅链接需要重新分发。
@@ -202,11 +217,11 @@ curl -s -D - "<订阅链接>" | head -20   # 200，头含 profile-update-interva
 
 上一节是走按钮或已有 fork 的推荐路径；这一节是等价的纯手工配置，适合不经过 Deploy to Cloudflare、自己把仓库接到 Workers Builds 的场景（也可以用来理解上一节的每一步在 Dashboard 里对应什么）。
 
-> **重要：Deploy command 不能用默认的 `npx wrangler deploy`。** 仓库里的 `wrangler.jsonc` 只保留 KV id 占位符，直接 `npx wrangler deploy` 会报 `KV namespace 'REPLACE_WITH_KV_NAMESPACE_ID' is not valid`。用根级 `npm run deploy`，它会在构建后生成注入好 id 的临时配置 `.wrangler.deploy.jsonc` 再部署，并跳过 CI 里不存在的 Secret 上传。
+> **重要：Deploy command 不能用默认的 `npx wrangler deploy`。** 仓库里的 `wrangler.jsonc` 只保留 KV id 占位符，直接 `npx wrangler deploy` 会报 `KV namespace 'REPLACE_WITH_KV_NAMESPACE_ID' is not valid`。必须走 `node scripts/deploy-worker.cjs`，它会在构建后生成注入好 id 的临时配置 `.wrangler.deploy.jsonc` 再部署。两种可接受写法：`npm run deploy`（自带 `SUBBOOST_SKIP_SECRETS=1`，KV 按标题查找/创建），或 `SUBBOOST_KV_ID=<你的 KV id> SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`（显式指定 id）。
 
 1. Workers & Pages → Create → Import a repository → 选择本仓库，Production branch 填 `main`。
 2. Root directory 保持 `/`，Build command 留空（`prepare` 会自动构建）。
-3. **Deploy command** 保持 `npm run deploy`（等价于 `SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`）。
+3. **Deploy command** 填 `npm run deploy`；若已有带显式 id 的旧命令（`SUBBOOST_KV_ID=<id> SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`），保留原样即可，效果等价。
 4. （可选）想固定复用某个已存在的 KV，而不是让脚本按标题 `SUBBOOST_KV` 查找/创建：把 `SUBBOOST_KV_ID=<你的 KV id>` 配成 Workers Builds 的 **Build variable**。id 取自 Storage & Databases → KV。
 5. 在 Worker 的 Settings → Variables & Secrets 添加两个 Secret 类型的运行时变量：`ADMIN_TOKEN`、`ENCRYPTION_KEY`。这两个不配，管理接口按 fail closed 返回 503。
 6. 推送代码即完成构建与部署。
