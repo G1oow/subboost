@@ -152,24 +152,64 @@ curl -s -D - "<订阅链接>" | head -20   # 200，头含 profile-update-interva
 - 订阅返回 503 `No nodes available`：所有源抓取失败或尚未刷新，先在管理页点「立即刷新」并查看状态面板的错误信息。
 - 订阅生成慢或超限：Free 计划 CPU 限制所致，升级 Paid 或等待 Cron 预生成缓存。
 
-## Git 集成部署（Workers Builds）
+## 从 fork 仓库部署（Cloudflare 一键部署按钮 / Workers Builds）
 
-上面是默认的本地部署方式。如果你希望推送代码后由 Cloudflare 自动构建并部署（Dashboard 里 Create → Import a repository / “Continue with GitHub”），可以连接 GitHub 仓库走 Workers Builds。
+适合不想在本机装 Node、登录 wrangler 的场景：把仓库 fork 到自己名下，交给 Cloudflare 构建并部署。下面两种入口最终落到同一个方式 —— Workers Builds 连接你 fork 的仓库，推送即构建。
 
-> **重要：Deploy command 不能保持默认。** 仓库里的 `wrangler.jsonc` 只保留 KV id 占位符，直接 `npx wrangler deploy` 会报 `KV namespace 'REPLACE_WITH_KV_NAMESPACE_ID' is not valid`。需要在 Workers Builds 的 Deploy command 里注入真实 id：
+### 方式 A：一键部署按钮（推荐首次部署）
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/G1oow/subboost)
+
+1. 点上面的按钮（等价于打开 `https://deploy.workers.cloudflare.com/?url=<你 fork 的仓库 URL>`），用 GitHub 登录并授权 Cloudflare。
+2. 在配置页确认三项，其余保持默认：
+   - **Git 账号 / 仓库名**：Cloudflare 会把源仓库复制到你自己的 GitHub 账号下，不会改动上游仓库。
+   - **Worker 名称**：默认取 `wrangler.jsonc` 的 `name`（`subboost`），可改；改名后 workers.dev 地址随之变化。
+   - **KV namespace 名称**：默认 `SUBBOOST_KV`，Cloudflare 按绑定名自动创建，不需要预先存在。
+
+   构建/部署命令由 Cloudflare 从 `package.json` 自动识别并预填：Build command 留空（安装依赖时的 `prepare` 已构建管理页），Deploy command 为 `npm run deploy` —— 根 `package.json` 的 `deploy` 会跳过 Secret 上传（CI 里没有密钥），只用自动创建的 KV 完成部署。
+3. 点 Deploy，等待 Workers Builds 完成构建。
+4. 部署完成后补两个运行时 Secret，见下方「部署后必须做的两步」。
+
+> **为什么能自动建 KV**：Deploy to Cloudflare 会读取仓库根目录的 Wrangler 配置，按绑定名创建缺失的资源，并把新创建的 namespace id 写回配置。仓库里的 `wrangler.jsonc` 因此只保留绑定名 `SUBBOOST_KV` 与占位符 id `REPLACE_WITH_KV_NAMESPACE_ID`，真实 id 不进版本库。官方说明见 [Deploy to Cloudflare buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)。
+
+### 部署后必须做的两步
+
+1. **加运行时 Secret**：Worker → Settings → Variables and Secrets，添加 **Secret** 类型的 `ADMIN_TOKEN` 与 `ENCRYPTION_KEY`（各 32 位以上随机串，生成命令见上文「首次部署」）。没配之前管理接口按 fail closed 返回 503。
+2. **按「第 2 步：部署后验证」复核**：`/api/health`、`/api/state` 的鉴权行为，以及重定向逐跳 SSRF 校验、Cron 触发两项本地无法验证的内容。
+
+一键部署与 Push 部署的区别只有入口：前者在你账号下新建仓库并立刻构建一次，后者由你已有的 fork 在每次推送时触发构建。之后都按下面的方式维护。
+
+### 方式 B：已有 fork 仓库 + Workers Builds
+
+适合已经 fork 过、想持续跟随上游更新的场景：
+
+1. Workers & Pages → Create → Import a repository → 选择**你自己的 fork**，Production branch 填 `main`。
+2. Root directory 保持 `/`；Build command 留空（`prepare` 会自动构建管理页）。
+3. Deploy command 保持 `npm run deploy` 即可（等价于 `SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`）。仓库里的 `wrangler.jsonc` 只含 KV id 占位符，直接 `npx wrangler deploy` 会报 `KV namespace 'REPLACE_WITH_KV_NAMESPACE_ID' is not valid`；脚本会自己按标题 `SUBBOOST_KV` 查找/创建 KV 并注入 id，所以**不要**改回默认的 `npx wrangler deploy`。若想固定复用某个已存在的 KV，在 Build variables 里加 `SUBBOOST_KV_ID=<你的 KV id>`。
+4. 在 Worker 的 Settings → Variables and Secrets 添加 `ADMIN_TOKEN`、`ENCRYPTION_KEY` 两个 Secret。
+5. 之后每次 push 到 `main` 自动构建部署；同步上游用 GitHub 的 Sync fork（或 `git pull upstream main`）后推送即可，KV 数据与 Secret 不受影响。
+
+### fork 部署常见问题
+
+- **构建报了 KV id 无效**：Deploy command 被改成了 `npx wrangler deploy`。改回 `npm run deploy`；或在 Build variables 里配 `SUBBOOST_KV_ID=<你的 KV id>`（脚本会跳过查找与创建）。
+- **构建时提示密钥校验未通过**：Deploy command 被改成了 `npm run worker:deploy`，该命令要求 CI 里存在 `ADMIN_TOKEN` / `ENCRYPTION_KEY`。改用根级 `npm run deploy`（自带 `SUBBOOST_SKIP_SECRETS=1`），运行时密钥走 Dashboard 的 Worker Secret（见「运行时 Secret」）。
+- **管理页打开但接口全 503**：`ADMIN_TOKEN` / `ENCRYPTION_KEY` 只配在 Build variables 里。Build variables 只在构建阶段生效，运行时 Secret 必须在 Worker Settings 里另加。
+- **Node 版本过旧**：Workers Builds 构建镜像默认 Node 24.18.0，低于仓库 `.nvmrc` 要求的 24.22.1；Workers Builds 会自动识别 `.nvmrc` 覆盖，若构建日志显示的版本不符，可显式设置 `NODE_VERSION=24.22.1`。
+- **改了 Worker 名称**：`wrangler.jsonc` 的 `name` 与 Dashboard 里的项目名以后部署的为准；改名等于换了一个 workers.dev 域名，原订阅链接需要重新分发。
+- **想改回本地部署**：本地 `npm run worker:deploy` 与 Workers Builds 部署的是同一个 Worker，同名以后部署的为准，属正常覆盖；Cron `0 */12 * * *` 随每次部署重新注册。
+
+## Git 集成部署（Workers Builds，手工配置）
+
+上一节是走按钮或已有 fork 的推荐路径；这一节是等价的纯手工配置，适合不经过 Deploy to Cloudflare、自己把仓库接到 Workers Builds 的场景（也可以用来理解上一节的每一步在 Dashboard 里对应什么）。
+
+> **重要：Deploy command 不能用默认的 `npx wrangler deploy`。** 仓库里的 `wrangler.jsonc` 只保留 KV id 占位符，直接 `npx wrangler deploy` 会报 `KV namespace 'REPLACE_WITH_KV_NAMESPACE_ID' is not valid`。用根级 `npm run deploy`，它会在构建后生成注入好 id 的临时配置 `.wrangler.deploy.jsonc` 再部署，并跳过 CI 里不存在的 Secret 上传。
 
 1. Workers & Pages → Create → Import a repository → 选择本仓库，Production branch 填 `main`。
 2. Root directory 保持 `/`，Build command 留空（`prepare` 会自动构建）。
-3. **Deploy command** 改为：
-
-   ```bash
-   SUBBOOST_KV_ID=<your-kv-id> SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy
-   ```
-
-   其中 `<your-kv-id>` 换成 Storage & Databases → KV 里 `SUBBOOST_KV` 的 id。脚本会在构建后生成注入好的临时配置 `.wrangler.deploy.jsonc` 再部署；`SUBBOOST_SKIP_SECRETS=1` 让 CI 不去改 Secret（运行时密钥用下一步的 Worker Secret）。
-   把 `SUBBOOST_KV_ID`、`SUBBOOST_SKIP_SECRETS` 配成 Workers Builds 的 **Build variables**。若省略 `SUBBOOST_KV_ID`，脚本会按标题 `SUBBOOST_KV` 查找并复用。
-4. 在 Worker 的 Settings → Variables & Secrets 添加两个 Secret 类型的运行时变量：`ADMIN_TOKEN`、`ENCRYPTION_KEY`。
-5. 推送代码即完成构建与部署。
+3. **Deploy command** 保持 `npm run deploy`（等价于 `SUBBOOST_SKIP_SECRETS=1 npm run worker:deploy`）。
+4. （可选）想固定复用某个已存在的 KV，而不是让脚本按标题 `SUBBOOST_KV` 查找/创建：把 `SUBBOOST_KV_ID=<你的 KV id>` 配成 Workers Builds 的 **Build variable**。id 取自 Storage & Databases → KV。
+5. 在 Worker 的 Settings → Variables & Secrets 添加两个 Secret 类型的运行时变量：`ADMIN_TOKEN`、`ENCRYPTION_KEY`。这两个不配，管理接口按 fail closed 返回 503。
+6. 推送代码即完成构建与部署。
 
 ### 为什么这样配置
 
@@ -180,7 +220,7 @@ curl -s -D - "<订阅链接>" | head -20   # 200，头含 profile-update-interva
 ### 前置
 
 - 仓库已推送到 GitHub（Workers Builds 只读你连接的那个仓库/分支）。
-- KV namespace 已存在（`npx wrangler kv namespace create SUBBOOST_KV`，或 Dashboard → Storage & Databases → KV 创建），并知道它的 id。仓库里不保存该 id，通过 `SUBBOOST_KV_ID` 注入。
+- KV namespace 不需要预先创建：`npm run deploy` 会按标题 `SUBBOOST_KV` 查找，找不到就新建。只有想固定复用某个已有 namespace 时，才需要拿到它的 id 并通过 Build variable `SUBBOOST_KV_ID` 传入（仓库里不保存该 id）。
 - Node 版本：Workers Builds 构建镜像默认 Node 24.18.0，低于 2026-10 安全版本线（22.23.4 / 24.22.1，含 CVE-2026-105482 / 105483 / 106069 / 106072 / 111497）。仓库根目录已放 `.nvmrc`（`24.22.1`），Workers Builds 会自动识别并覆盖默认版本，无需在 Dashboard 配置 `NODE_VERSION`。CI 与本地同用 24.22.1。
 
 ### 运行时 Secret
