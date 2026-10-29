@@ -41,6 +41,9 @@ export default mergeConfig(
           "**/tailwind.config.{ts,js,mjs}",
           "**/generated/prisma/**",
           "**/prisma/generated/**",
+          // 部署 CLI 是纯进程装配入口（spawn wrangler、读写文件），逻辑已抽到
+          // scripts/lib/deploy-runner.cjs 并被完整覆盖；入口本身由 dry-run 手测覆盖。
+          "scripts/deploy-worker.cjs",
         ],
         reporter: ["text", "json-summary", "html", "lcov"],
         reportsDirectory: "coverage",
