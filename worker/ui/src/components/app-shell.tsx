@@ -113,7 +113,10 @@ export function AppShell({
                   ) : null}
                   <span className="whitespace-nowrap">{item.label}</span>
                   {typeof item.badge === "number" && item.badge > 0 ? (
-                    <span className="rounded-full bg-ink/10 px-1.5 text-[10px] leading-4 text-fg-60">
+                    <span
+                      key={item.badge}
+                      className="animate-icon-pop rounded-full bg-ink/10 px-1.5 text-[10px] leading-4 text-fg-60"
+                    >
                       {item.badge}
                     </span>
                   ) : null}

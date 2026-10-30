@@ -302,7 +302,7 @@ export function SourcesPanel({ state, onSave, onParseNodes, onLoadNodes }: Sourc
       </CardHeader>
       <CardContent>
         {state.sources.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-ink/15 px-4 py-10 text-center">
+          <div className="animate-fade-in-up rounded-xl border border-dashed border-ink/15 px-4 py-10 text-center">
             <Boxes aria-hidden="true" className="mx-auto mb-2 h-6 w-6 text-fg-35" />
             <p className="text-sm text-fg-50">还没有源，先添加一个上游订阅或手动节点。</p>
           </div>

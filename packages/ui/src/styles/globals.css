@@ -20,6 +20,20 @@
   --animate-float: float 7s ease-in-out infinite;
   --animate-spin-slow: spin 2.6s linear infinite;
   --animate-badge-pulse: badgePulse 2.4s ease-in-out infinite;
+  /* 覆盖层 / 弹窗 / Toast 进出场，配合 Radix Presence 的 animationend 卸载 */
+  --animate-overlay-in: overlayIn 0.18s ease-out;
+  --animate-overlay-out: overlayOut 0.15s ease-in;
+  --animate-dialog-in: dialogIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-dialog-out: dialogOut 0.16s cubic-bezier(0.4, 0, 1, 1);
+  /* 下拉/弹出菜单：比弹窗更快、回弹更明显，贴合触发器一侧展开 */
+  --animate-menu-in: menuIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-menu-out: menuOut 0.12s cubic-bezier(0.4, 0, 1, 1);
+  --animate-toast-in: toastIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-toast-out: toastOut 0.16s ease-in;
+  /* 状态图标切换时的轻量弹入，用在勾选/复制成功这类瞬时反馈 */
+  --animate-icon-pop: iconPop 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+  /* Toast 底部进度条：随停留时间从满到空，悬停时暂停 */
+  --animate-toast-progress: toastProgress 15s linear forwards;
 }
 :root {
   /* react-remove-scroll(-bar) 支持：用于在锁定滚动时补偿滚动条占位，避免水平抖动 */
@@ -99,8 +113,8 @@
 }
 
 @keyframes slideUp {
-  0% { transform: translateY(10px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
+  0% { translate: 0 10px; opacity: 0; }
+  100% { translate: 0 0; opacity: 1; }
 }
 
 @keyframes pulse-glow {
@@ -389,47 +403,53 @@
 }
 
 /* ===== 管理端页面动效 ===== */
+/* 页面入场：只动 opacity + translate，不动 scale。
+   scale 会改变元素尺寸，浏览器必须逐帧重新栅格化文字（字形缓存失效），
+   表现为文字在动画期间发虚、结束后突然变清晰，观感上像「动画跑过头又被拉回」。
+   translate 是合成层变换，文字栅格化一次即可，全程锐利且只占用合成线程。 */
 @keyframes pageIn {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.996);
+    translate: 0 8px;
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    translate: 0 0;
   }
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    translate: 0 16px;
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    translate: 0 0;
   }
 }
 
+/* 弹入：用独立的 scale 属性，不碰 transform。
+   元素可能已有 translate-* 定位（例如居中弹窗），写 transform 会把它整个覆盖掉。 */
 @keyframes popIn {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    scale: 0.94;
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    scale: 1;
   }
 }
 
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    translate: 0 8px;
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    translate: 0 0;
   }
 }
 
@@ -471,6 +491,66 @@
   }
 }
 
+/* 覆盖层、弹窗、Toast 的进出场。
+   这些元素由 Radix Presence 控制挂载：它监听 animationend 决定何时真正卸载，
+   所以必须用 data-[state=closed] 上的动画来触发退出，动画结束即移除。
+   关键帧只驱动 opacity / scale / translate（独立 CSS 属性），
+   不去写 transform，避免和元素自身的 translate-* 定位互相覆盖。 */
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes overlayOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 弹窗：从略小 + 略靠下处浮现，带 4px 上移，方向感比纯缩放更明确。
+   只动 scale/translate，不写 transform，避免覆盖 translate-x-[-50%] 的居中定位。 */
+@keyframes dialogIn {
+  from { opacity: 0; scale: 0.96; translate: 0 6px; }
+  to { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+@keyframes dialogOut {
+  from { opacity: 1; scale: 1; translate: 0 0; }
+  to { opacity: 0; scale: 0.98; translate: 0 4px; }
+}
+
+/* 下拉内容：贴着触发器方向展开。scale 原点由 data-[side] 归位到贴边一侧，
+   所以从触发器那一边"长出来"，而不是从中心放大。 */
+@keyframes menuIn {
+  from { opacity: 0; scale: 0.94; translate: 0 -4px; }
+  to { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+@keyframes menuOut {
+  from { opacity: 1; scale: 1; translate: 0 0; }
+  to { opacity: 0; scale: 0.96; translate: 0 -2px; }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; translate: 0 12px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; translate: 0 0; }
+  to { opacity: 0; translate: 0 6px; }
+}
+
+@keyframes iconPop {
+  0% { opacity: 0; scale: 0.6; rotate: -25deg; }
+  60% { opacity: 1; }
+  100% { opacity: 1; scale: 1; rotate: 0deg; }
+}
+
+@keyframes toastProgress {
+  from { scale: 1 1; }
+  to { scale: 0 1; }
+}
+
 @layer utilities {
   /* 列表/卡片交错入场：配合 animate-rise 使用 */
   .stagger-1 { animation-delay: 40ms; }
@@ -505,6 +585,28 @@
     );
     background-size: 220% 100%;
     border-radius: 0.75rem;
+  }
+
+  /* Toast 拖动反馈：Radix 在 data-swipe 上写入 --radix-toast-swipe-* 位移变量。
+     用独立的 translate 属性接收它，避免和进出场动画抢同一个属性。
+     will-change 只在拖动期间加：常驻会给每个 Toast 留一个合成层。 */
+  .toast-swipe {
+    translate: var(--radix-toast-swipe-move-x, 0) var(--radix-toast-swipe-move-y, 0);
+    transition: translate 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    touch-action: none;
+  }
+
+  .toast-swipe[data-swipe="move"] {
+    transition: none;
+    will-change: translate;
+  }
+
+  .toast-swipe[data-swipe="cancel"] {
+    translate: 0 0;
+  }
+
+  .toast-swipe[data-swipe="end"] {
+    translate: var(--radix-toast-swipe-end-x, 0) var(--radix-toast-swipe-end-y, 0);
   }
 
   /* 进度条/占比条：左对齐缩放 */

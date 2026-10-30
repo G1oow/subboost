@@ -21,6 +21,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     className={cn(
       "fixed inset-0 z-50 bg-overlay backdrop-blur-sm",
+      "data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out",
       className
     )}
     {...props}
@@ -28,26 +29,37 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+// 居中容器：用 grid 的 place-items 居中，不再依赖 translate-*。
+// Tailwind v4 的 translate-x/y-* 写的是独立的 translate 属性，
+// 与进出场关键帧里的 translate 是同一个属性，必然互相覆盖：
+// 动画期间居中定位被整个吞掉，弹窗会从错误位置飞入、结束再跳回原点。
+// 把定位交给容器后，内容元素上的 translate 只归动画所有。
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 p-6 rounded-2xl glass-card max-h-[85vh] overflow-y-auto custom-scrollbar",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1 opacity-70 transition-all hover:opacity-100 hover:bg-ink/5 focus:outline-none focus:ring-2 focus:ring-focus-ring disabled:pointer-events-none">
-        <X className="h-4 w-4 text-fg-60" />
-        <span className="sr-only">关闭</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
+    <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center p-4">
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          // 弹窗底色是不透明的（--surface 在明暗主题下都没有 alpha），
+          // 再叠 glass-card 的 backdrop-blur-xl 只会在每帧对整块背景做 24px 模糊，
+          // 既看不出效果又拖慢开合动画。这里直接给不透明底色 + 边框阴影。
+          "pointer-events-auto relative grid w-full max-w-lg gap-4 rounded-2xl border border-ink/10 bg-surface p-6 shadow-(--popover-shadow) max-h-[85vh] overflow-y-auto custom-scrollbar",
+          "data-[state=open]:animate-dialog-in data-[state=closed]:animate-dialog-out",
+          className
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1 opacity-70 transition-all hover:opacity-100 hover:bg-ink/5 focus:outline-none focus:ring-2 focus:ring-focus-ring disabled:pointer-events-none">
+          <X className="h-4 w-4 text-fg-60" />
+          <span className="sr-only">关闭</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </div>
   </DialogPortal>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;

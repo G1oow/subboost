@@ -35,7 +35,11 @@ const Toast = React.forwardRef<
   <ToastPrimitives.Root
     ref={ref}
     className={cn(
-      "group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden border p-4 shadow-lg transition-all glass-card",
+      "toast-swipe group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden border p-4 shadow-lg transition-all glass-card",
+      "data-[state=open]:animate-toast-in data-[state=closed]:animate-toast-out",
+      "data-[swipe=end]:animate-toast-out",
+      "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-left after:content-['']",
+      "after:animate-toast-progress after:bg-current after:opacity-30 group-hover:after:[animation-play-state:paused]",
       variant === "info" && "border-sky-500/30",
       variant === "success" && "border-emerald-500/30",
       variant === "warning" && "border-amber-500/30",

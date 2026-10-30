@@ -76,8 +76,15 @@ const SelectContent = React.forwardRef<
       ref={ref}
       className={cn(
         "relative z-50 max-h-[min(var(--radix-select-content-available-height,24rem),24rem)] min-w-[8rem] overflow-hidden rounded-xl border border-ink/10 bg-surface-raised text-fg shadow-md",
+        "data-[state=open]:animate-menu-in data-[state=closed]:animate-menu-out",
+        // 缩放原点贴着触发器：向下的菜单从顶部展开，向上的从底部展开，
+        // 看起来是"从按钮里长出来"，而不是整块从中心放大。
+        "data-[side=bottom]:origin-top data-[side=top]:origin-bottom",
+        // 与触发器的间距用 margin 而不是 translate-y-*：
+        // translate 属性已被 menuIn/menuOut 的位移动画占用，两者同时写会互相覆盖，
+        // 表现为菜单从错位处弹出。margin 不参与动画，可以安全共存。
         position === "popper" &&
-          "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+          "data-[side=bottom]:mt-1 data-[side=top]:mb-1 data-[side=left]:mr-1 data-[side=right]:ml-1",
         className
       )}
       position={position}
@@ -118,14 +125,14 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-ink/10 focus:text-fg data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none transition-colors duration-150 focus:bg-ink/10 focus:text-fg data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     {...props}
   >
     <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4 text-indigo-400" />
+        <Check className="animate-icon-pop h-4 w-4 text-indigo-400" />
       </SelectPrimitive.ItemIndicator>
     </span>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
