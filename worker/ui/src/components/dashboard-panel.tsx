@@ -212,13 +212,17 @@ export function DashboardPanel({
   return (
     <div className="space-y-6">
       <Card className="relative overflow-hidden">
+        {/* 两团背景光斑：只用渐变，不加 blur 滤镜。
+            blur(64px) 会把绘制范围从 224×224 撑到 608×608（约 5 倍面积），
+            再叠在 7s 无限循环的位移上，等于每帧重绘一块 600×600 的模糊贴图。
+            用 radial-gradient 直接画出柔边，观感一致但绘制面积回到元素本身。 */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary-500/15 blur-3xl"
+          className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,var(--glow-primary),transparent_70%)]"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 animate-float rounded-full bg-indigo-500/10 blur-3xl"
+          className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 animate-float rounded-full bg-[radial-gradient(circle,var(--glow-indigo),transparent_70%)] will-change-transform"
         />
         <CardContent className="relative flex flex-col gap-5 p-1 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
