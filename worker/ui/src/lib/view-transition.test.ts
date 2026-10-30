@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { prefersReducedMotion, runPageTransition, supportsViewTransition } from "./view-transition";
+import { prefersReducedMotion, runPageTransition } from "./view-transition";
 
 type TransitionStub = {
   finished: Promise<void>;
@@ -37,19 +37,33 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("view transition helper", () => {
-  it("detects browser support for the View Transitions API", () => {
-    stubDocument({ startViewTransition: () => settledTransition });
-    expect(supportsViewTransition()).toBe(true);
+describe("page transition helper", () => {
+  /**
+   * 回归护栏：View Transitions 的整页快照会阻塞主线程（实测低端设备 25-89ms），
+   * 是切页掉帧的主因。即使浏览器支持，也必须完全不调用 startViewTransition。
+   */
+  it("never uses the View Transitions API even when the browser supports it", () => {
+    const startViewTransition = vi.fn(() => settledTransition);
+    stubDocument({ startViewTransition });
 
-    stubDocument({});
-    expect(supportsViewTransition()).toBe(false);
+    runPageTransition(() => {});
+
+    expect(startViewTransition).not.toHaveBeenCalled();
   });
 
-  it("treats a missing document or matchMedia as no-op safe", () => {
+  it("runs the update synchronously in the same call", () => {
+    stubDocument({ startViewTransition: () => settledTransition });
+    const calls: string[] = [];
+
+    runPageTransition(() => calls.push("update"));
+
+    // flushSync 语义：返回前 update 已经执行完
+    expect(calls).toEqual(["update"]);
+  });
+
+  it("treats a missing window or matchMedia as no-op safe", () => {
     vi.stubGlobal("document", undefined);
     vi.stubGlobal("window", undefined);
-    expect(supportsViewTransition()).toBe(false);
     expect(prefersReducedMotion()).toBe(false);
   });
 
@@ -65,51 +79,17 @@ describe("view transition helper", () => {
     expect(prefersReducedMotion()).toBe(false);
   });
 
-  it("wraps the update in a view transition when supported", () => {
-    const calls: string[] = [];
-    const transition: TransitionStub = { ...settledTransition };
-    stubDocument({
-      startViewTransition: (callback) => {
-        calls.push("start");
-        void callback();
-        return transition;
-      },
-    });
-
-    runPageTransition(() => calls.push("update"));
-    expect(calls).toEqual(["start", "update"]);
-  });
-
-  it("runs the update directly when the API is unsupported", () => {
-    stubDocument({});
-    const update = vi.fn();
-
-    runPageTransition(update);
-    expect(update).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips the transition when the user prefers reduced motion", () => {
-    const startViewTransition = vi.fn(() => settledTransition);
-    stubDocument({ startViewTransition });
+  it("still runs the update when the user prefers reduced motion", () => {
     stubMatchMedia(true);
     const update = vi.fn();
 
     runPageTransition(update);
-    expect(startViewTransition).not.toHaveBeenCalled();
+
     expect(update).toHaveBeenCalledTimes(1);
   });
 
-  it("swallows rejection from an interrupted transition", async () => {
-    const rejected = Promise.reject(new Error("interrupted"));
-    rejected.catch(() => undefined);
-    stubDocument({
-      startViewTransition: (callback) => {
-        void callback();
-        return { ...settledTransition, ready: rejected, finished: rejected };
-      },
-    });
-
+  it("does not throw when no View Transitions API exists at all", () => {
+    stubDocument({});
     expect(() => runPageTransition(() => {})).not.toThrow();
-    await Promise.resolve();
   });
 });
