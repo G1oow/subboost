@@ -1,0 +1,133 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const globalsCss = readFileSync(join(__dirname, "globals.css"), "utf8");
+
+/** 动画工具类：--animate-<name>: <keyframes 名> ... */
+const ANIMATE_TOKENS = /--animate-([\w-]+):\s*([\w-]+)\s/gu;
+/** @keyframes 定义 */
+const KEYFRAME_BLOCKS = /@keyframes\s+([\w-]+)\s*\{/gu;
+
+const tokenKeyframes = new Map(
+  [...globalsCss.matchAll(ANIMATE_TOKENS)].map((match) => [match[1], match[2]])
+);
+const keyframeNames = new Set([...globalsCss.matchAll(KEYFRAME_BLOCKS)].map((match) => match[1]));
+
+/** 覆盖层 / 弹窗 / 下拉 / Toast 的进出场：Radix Presence 靠退出动画决定何时卸载 */
+const OVERLAY_MOTION = {
+  "overlay-in": "overlayIn",
+  "overlay-out": "overlayOut",
+  "dialog-in": "dialogIn",
+  "dialog-out": "dialogOut",
+  "menu-in": "menuIn",
+  "menu-out": "menuOut",
+  "toast-in": "toastIn",
+  "toast-out": "toastOut",
+  "toast-progress": "toastProgress",
+  "icon-pop": "iconPop",
+} as const;
+
+/** 这些关键帧绝不能再动 transform：会覆盖元素自身的 translate-* 定位 */
+const NO_TRANSFORM_KEYFRAMES = ["pageIn", "dialogIn", "dialogOut", "menuIn", "menuOut", "popIn"];
+
+function keyframeBody(name: string): string {
+  const start = globalsCss.indexOf(`@keyframes ${name}`);
+  if (start < 0) return "";
+  // 从声明的 { 起做一次大括号配平，避免正则截断嵌套规则
+  let depth = 0;
+  let i = globalsCss.indexOf("{", start);
+  const from = i;
+  for (; i < globalsCss.length; i += 1) {
+    if (globalsCss[i] === "{") depth += 1;
+    else if (globalsCss[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return globalsCss.slice(from, i + 1);
+    }
+  }
+  return "";
+}
+
+describe("motion tokens", () => {
+  it("parses the stylesheet instead of silently matching nothing", () => {
+    // 正则若与写法漂移，下面几条会变成空跑的假绿
+    expect(tokenKeyframes.size).toBeGreaterThan(10);
+    expect(keyframeNames.size).toBeGreaterThan(10);
+  });
+
+  it("points every motion token at its keyframes", () => {
+    for (const [token, keyframes] of Object.entries(OVERLAY_MOTION)) {
+      expect(tokenKeyframes.get(token)).toBe(keyframes);
+    }
+  });
+
+  it("defines keyframes for every motion token", () => {
+    const missing = Object.values(OVERLAY_MOTION).filter((name) => !keyframeNames.has(name));
+    expect(missing).toEqual([]);
+  });
+
+  it("keeps entering/exiting pairs that Radix Presence can detect", () => {
+    // 缺一个退出动画 → Radix 立即卸载 → 用户看到的仍是硬切
+    for (const token of Object.keys(OVERLAY_MOTION)) {
+      expect(tokenKeyframes.has(token)).toBe(true);
+    }
+    expect(tokenKeyframes.get("dialog-out")).toBe("dialogOut");
+    expect(tokenKeyframes.get("menu-out")).toBe("menuOut");
+    expect(tokenKeyframes.get("toast-out")).toBe("toastOut");
+  });
+});
+
+describe("text rasterization", () => {
+  it("never animates transform in page/dialog/menu keyframes", () => {
+    // transform: scale()/translateY() 会触发逐帧重新栅格化：
+    // 文字在动画期间发虚、结束后突变清晰，观感像"动画跑过头又被拉回"。
+    // 这些关键帧必须只用独立的 opacity / translate / scale 属性。
+    for (const name of NO_TRANSFORM_KEYFRAMES) {
+      const body = keyframeBody(name);
+      expect(body, `@keyframes ${name} 未找到`).not.toBe("");
+      expect(body, `@keyframes ${name} 不得使用 transform`).not.toMatch(/(^|[^-\w])transform\s*:/u);
+    }
+  });
+
+  it("keeps pageIn free of scale", () => {
+    // 整页缩放的代价最大：整棵子树都要按新尺寸重新栅格化
+    expect(keyframeBody("pageIn")).not.toMatch(/(^|[^-\w])scale\s*:/u);
+  });
+});
+
+describe("positioning vs. animation property conflicts", () => {
+  /**
+   * Tailwind v4 的 translate-x/y-* 写的是独立的 translate 属性，
+   * 和进出场关键帧里的 translate 是同一个属性，同时使用必然互相覆盖：
+   * 动画期间定位被吞掉，元素从错位处飞入、结束再跳回，表现为「动画错位」。
+   * 因此凡是自带 translate-* 定位的元素，其动画关键帧不得再写 translate。
+   */
+  it("does not let dialog positioning share the translate property with keyframes", () => {
+    const dialogSource = readFileSync(
+      join(__dirname, "../components/ui/dialog.tsx"),
+      "utf8"
+    );
+    // 居中改由 grid 容器承担，内容元素上不应再有 translate-x/y 工具类
+    expect(dialogSource).not.toMatch(/translate-[xy]-\[?-?[0-9]/u);
+    // 但动画本身仍然要用 translate 做微位移
+    expect(keyframeBody("dialogIn")).toMatch(/translate\s*:/u);
+  });
+
+  it("keeps select offsets on margin so menu keyframes own translate", () => {
+    const selectSource = readFileSync(
+      join(__dirname, "../components/ui/select.tsx"),
+      "utf8"
+    );
+    // 与触发器的间距用 margin，不能再用 translate-y-*
+    expect(selectSource).not.toMatch(/(?:^|["\s])translate-[xy]-1/u);
+    expect(selectSource).toMatch(/data-\[side=bottom\]:mt-1/u);
+    // 菜单动画依赖 translate 做位移动画
+    expect(keyframeBody("menuIn")).toMatch(/translate\s*:/u);
+  });
+});
+
+describe("reduced motion", () => {
+  it("keeps the escape hatch", () => {
+    expect(globalsCss).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+});

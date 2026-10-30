@@ -1,6 +1,6 @@
 {
   "name": "subboost-worker-lite",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "AGPL-3.0-only",
   "private": true,
   "engines": {
@@ -27,9 +27,11 @@
     "test:unit": "vitest run",
     "test:coverage": "vitest run --config vitest.coverage.ts --coverage",
     "test:core": "vitest run --config vitest.core.config.ts",
-    "lint": "eslint packages worker --max-warnings=0 && npm run check:ui-consistency && npm run check:repo-hygiene",
+    "lint": "eslint packages worker --max-warnings=0 && npm run check:ui-consistency && npm run check:repo-hygiene && npm run check:version",
     "check:ui-consistency": "node scripts/check-ui-consistency.cjs packages worker",
     "check:repo-hygiene": "node scripts/check-repo-hygiene.cjs",
+    "check:version": "node scripts/check-version.cjs",
+    "version:set": "node scripts/check-version.cjs --set",
     "worker:dev": "npm --workspace @subboost/worker run dev",
     "worker:dev:ui": "npm --workspace @subboost/worker run dev:ui",
     "worker:build": "npm --workspace @subboost/worker run build",

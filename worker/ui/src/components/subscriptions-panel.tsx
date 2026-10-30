@@ -196,7 +196,7 @@ export function SubscriptionsPanel({
       </CardHeader>
       <CardContent>
         {state.sources.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-ink/15 px-4 py-10 text-center">
+          <div className="animate-fade-in-up rounded-xl border border-dashed border-ink/15 px-4 py-10 text-center">
             <Link2 aria-hidden="true" className="mx-auto mb-2 h-6 w-6 text-fg-35" />
             <p className="text-sm text-fg-50">请先添加源，再创建订阅链接。</p>
           </div>
@@ -236,7 +236,9 @@ export function SubscriptionsPanel({
                       <IconButton label={`复制 ${subscription.name} 链接`} variant="ghost" onClick={() => handleCopy(subscription)}>
                         <Check
                           aria-hidden="true"
-                          className={cn(copiedId === subscription.id ? "text-emerald-400" : "hidden")}
+                          className={cn(
+                            copiedId === subscription.id ? "animate-icon-pop text-emerald-400" : "hidden"
+                          )}
                         />
                         <Copy
                           aria-hidden="true"

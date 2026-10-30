@@ -35,9 +35,9 @@ export function TokenGate({ onAuthenticated }: TokenGateProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-page">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md animate-rise">
         <div className="text-center mb-8">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-ink/10 bg-ink/5">
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-ink/10 bg-ink/5 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-105">
             <KeyRound className="h-7 w-7 text-indigo-400" aria-hidden="true" />
           </div>
           <h1 className="text-2xl font-bold mt-4 text-fg">SubBoost Lite</h1>
@@ -46,7 +46,7 @@ export function TokenGate({ onAuthenticated }: TokenGateProps) {
 
         <form
           onSubmit={handleSubmit}
-          className="bg-ink/5 backdrop-blur-sm border border-ink/10 rounded-2xl p-6 space-y-4"
+          className="animate-rise stagger-2 bg-ink/5 backdrop-blur-sm border border-ink/10 rounded-2xl p-6 space-y-4"
         >
           <PasswordField
             label="访问 token"
