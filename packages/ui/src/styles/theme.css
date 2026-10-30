@@ -26,6 +26,9 @@
     --solid-label-bg: var(--color-blue-500);
     --page-glow: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.15) 0%, transparent 50%);
     --page-pattern: none;
+    /* 仪表板背景光斑：用 radial-gradient 画出柔边，避免 blur 滤镜把绘制面积撑大 */
+    --glow-primary: color-mix(in oklab, var(--color-primary-500) 15%, transparent);
+    --glow-indigo: color-mix(in oklab, var(--color-indigo-500) 10%, transparent);
     --surface: #141414;
     --surface-subtle: #151515;
     --surface-raised: #1a1a1a;
