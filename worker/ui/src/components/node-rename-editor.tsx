@@ -3,6 +3,7 @@ import { RotateCcw, Search } from "lucide-react";
 import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
 import { ProtocolBadge } from "@subboost/ui/components/ui/protocol-badge";
+import { MotionItem, MotionList } from "@subboost/ui/motion/motion-list";
 import { cn } from "@subboost/ui/lib/utils";
 import type { NodeRenames, NodeSummary } from "../lib/types";
 
@@ -15,8 +16,6 @@ export type NodeRenameEditorProps = {
   maxHeightClassName?: string;
   className?: string;
 };
-
-const STAGGER = ["stagger-1", "stagger-2", "stagger-3", "stagger-4", "stagger-5", "stagger-6", "stagger-7", "stagger-8"];
 
 function matchesQuery(node: NodeSummary, query: string): boolean {
   if (!query) return true;
@@ -91,31 +90,40 @@ export function NodeRenameEditor({
           {nodes.length === 0 ? emptyHint : "没有匹配的节点。"}
         </p>
       ) : (
-        <ul className={cn("space-y-1.5 overflow-y-auto pr-1", maxHeightClassName)}>
-          {visible.map((node, index) => {
+        <MotionList
+          as="ul"
+          className={cn("space-y-1.5 overflow-y-auto pr-1", maxHeightClassName)}
+          animateOnMount
+          /* 搜索过滤会一次移除多条，popLayout 让剩余项立即补位，不会留下空档 */
+          mode="popLayout"
+        >
+          {visible.map((node) => {
             const renamed = Boolean(renames[node.key]);
             return (
-              <li
+              <MotionItem
                 key={node.key}
+                itemKey={node.key}
+                /* 容器可滚动：向上入场，避免动画期间撑出滚动条 */
+                enterFrom="up"
                 className={cn(
-                  "animate-rise flex items-center gap-2 rounded-xl border px-2.5 py-2 transition-colors",
-                  STAGGER[Math.min(index, STAGGER.length - 1)],
+                  "flex items-center gap-2 rounded-xl border px-2.5 py-2 transition-colors",
                   renamed ? "border-primary-500/40 bg-primary-500/10" : "border-ink/10 bg-ink/5"
                 )}
               >
                 <ProtocolBadge type={node.type} className="shrink-0" />
                 <div className="min-w-0 flex-1">
+                  {/* 原名（含服务器）在上作为说明，输入框（节点名）在下作为主体 */}
+                  <p className="mb-1 truncate text-[11px] text-fg-40">
+                    {renamed ? `原名 ${node.originName || "—"}` : node.originName || "—"}
+                    {node.server ? ` · ${node.server}${node.port ? `:${node.port}` : ""}` : ""}
+                  </p>
                   <Input
                     value={renames[node.key] ?? ""}
                     onChange={(event) => setName(node, event.target.value)}
-                    placeholder={node.originName || "未命名节点"}
+                    placeholder="填入新名称"
                     aria-label={`重命名节点 ${node.originName || node.key}`}
                     className="h-8 text-sm"
                   />
-                  <p className="mt-1 truncate text-[11px] text-fg-40">
-                    原名 {node.originName || "—"}
-                    {node.server ? ` · ${node.server}${node.port ? `:${node.port}` : ""}` : ""}
-                  </p>
                 </div>
                 {renamed ? (
                   <IconButton
@@ -126,10 +134,10 @@ export function NodeRenameEditor({
                     <RotateCcw aria-hidden="true" />
                   </IconButton>
                 ) : null}
-              </li>
+              </MotionItem>
             );
           })}
-        </ul>
+        </MotionList>
       )}
 
       {nodes.length > visible.length ? (

@@ -20,6 +20,8 @@ import { Badge, badgeVariants } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@subboost/ui/components/ui/card";
 import { ProtocolBadge } from "@subboost/ui/components/ui/protocol-badge";
+import { MotionItem, MotionList, MotionReveal } from "@subboost/ui/motion/motion-list";
+import { SpotlightCard } from "@subboost/ui/motion/spotlight-card";
 import { cn } from "@subboost/ui/lib/utils";
 import { formatCount, formatDuration, formatPercent, formatRelativeTime } from "../lib/format";
 import { useAnimatedNumber } from "../lib/use-animated-number";
@@ -44,8 +46,6 @@ export type DashboardPanelProps = {
   onLoadNodes?: (sourceId: string) => Promise<SourceNodesResponse>;
 };
 
-const STAGGER = ["stagger-1", "stagger-2", "stagger-3", "stagger-4"];
-
 function AnimatedCount({ value, className }: { value: number; className?: string }) {
   const animated = useAnimatedNumber(value);
   return <span className={cn("tabular-nums", className)}>{formatCount(animated)}</span>;
@@ -56,26 +56,23 @@ function StatCard({
   value,
   hint,
   icon,
-  index,
   accent,
   onClick,
+  className,
 }: {
   label: string;
   value: number;
   hint: React.ReactNode;
   icon: React.ReactNode;
-  index: number;
   accent: string;
   onClick?: () => void;
+  className?: string;
 }) {
   const content = (
     <>
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium text-fg-50">{label}</p>
-        <span
-          aria-hidden="true"
-          className={cn("flex h-8 w-8 items-center justify-center rounded-xl border", accent)}
-        >
+        <span aria-hidden="true" className={cn("shrink-0", accent)}>
           {icon}
         </span>
       </div>
@@ -86,16 +83,20 @@ function StatCard({
     </>
   );
 
-  const className = cn(
-    "animate-rise hover-lift w-full rounded-2xl border border-ink/10 bg-surface p-4 text-left shadow-(--surface-shadow)",
-    STAGGER[index % STAGGER.length]
-  );
-
-  if (!onClick) return <div className={className}>{content}</div>;
   return (
-    <button type="button" onClick={onClick} className={cn(className, "hover:border-primary-500/40")}>
-      {content}
-    </button>
+    <SpotlightCard className={cn("p-4", className)} data-testid="dashboard-stat-card">
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          className="w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          {content}
+        </button>
+      ) : (
+        content
+      )}
+    </SpotlightCard>
   );
 }
 
@@ -122,6 +123,8 @@ function buildFallbackSourceStats(state: AppState): DashboardSourceStat[] {
     };
   });
 }
+
+const MAX_COLLAPSED_SOURCES = 6;
 
 export function DashboardPanel({
   state,
@@ -205,22 +208,14 @@ export function DashboardPanel({
           ? { label: "待配置", variant: "outline" as const }
           : { label: "运行正常", variant: "success" as const };
 
-  const handleRefresh = async () => {
-    await onRefresh();
-  };
+  const visibleSourceStats = showAllSources
+    ? sourceStats
+    : sourceStats.slice(0, MAX_COLLAPSED_SOURCES);
 
   return (
     <div className="space-y-6">
-      <Card className="relative overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary-500/15 blur-3xl"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 animate-float rounded-full bg-indigo-500/10 blur-3xl"
-        />
-        <CardContent className="relative flex flex-col gap-5 p-1 sm:flex-row sm:items-center sm:justify-between">
+      <SpotlightCard className="animate-rise p-5">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={health.variant} className="gap-1">
@@ -251,8 +246,8 @@ export function DashboardPanel({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={handleRefresh} disabled={refreshing}>
-              <RefreshCw className={refreshing ? "animate-spin" : undefined} aria-hidden="true" />
+            <Button onClick={() => void onRefresh()} disabled={refreshing}>
+              <RefreshCw aria-hidden="true" className={refreshing ? "animate-spin" : undefined} />
               {refreshing ? "刷新中…" : "立即刷新"}
             </Button>
             <Button variant="secondary" onClick={() => onNavigate("subscriptions")}>
@@ -260,54 +255,55 @@ export function DashboardPanel({
               <ArrowRight aria-hidden="true" />
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </SpotlightCard>
 
+      {/*
+        这四张卡固定、不增删也不换序，不需要 Motion 的列表语义。
+        改用与页面其他卡片同一套 animate-rise + stagger：
+        同为 0.44s / 16px 的 CSS 关键帧，观感才一致。
+      */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          index={0}
+          className="animate-rise stagger-1"
           label="源"
           value={totalSources}
           icon={<Server className="h-4 w-4" />}
-          accent="border-primary-500/30 bg-primary-500/15 text-primary-200"
+          accent="text-primary-300"
           hint={`${enabledSources} 启用 · ${remoteSources} 远程 / ${manualSources} 手动`}
           onClick={() => onNavigate("sources")}
         />
         <StatCard
-          index={1}
+          className="animate-rise stagger-2"
           label="订阅链接"
           value={totalSubscriptions}
           icon={<Link2 className="h-4 w-4" />}
-          accent="border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
+          accent="text-indigo-300"
           hint={`${allSourceSubscriptions} 条使用全部启用源`}
           onClick={() => onNavigate("subscriptions")}
         />
         <StatCard
-          index={2}
+          className="animate-rise stagger-3"
           label="可用节点"
           value={totalNodes}
           icon={<Boxes className="h-4 w-4" />}
-          accent="border-emerald-500/30 bg-emerald-500/15 text-emerald-200"
+          accent="text-emerald-300"
           hint={renamedNodes > 0 ? `${renamedNodes} 个已改名` : "来自启用源的节点快照"}
           onClick={() => onNavigate("sources")}
         />
         <StatCard
-          index={3}
+          className="animate-rise stagger-4"
           label="刷新失败源"
           value={failedSources}
           icon={<Gauge className="h-4 w-4" />}
-          accent={
-            failedSources > 0
-              ? "border-red-500/30 bg-red-500/15 text-red-200"
-              : "border-ink/10 bg-ink/5 text-fg-60"
-          }
+          accent={failedSources > 0 ? "text-red-300" : "text-fg-40"}
           hint={failedSources > 0 ? "展开提醒查看错误" : "上次刷新全部成功"}
           onClick={() => onNavigate("status")}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="animate-rise stagger-2">
+        <Card className="animate-rise">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -330,9 +326,9 @@ export function DashboardPanel({
                 还没有节点数据，刷新一次或等待定时任务抓取。
               </p>
             ) : (
-              <ul className="space-y-3">
-                {protocols.map((item, index) => (
-                  <li key={item.type} className="animate-fade-in-up space-y-1.5" style={{ animationDelay: `${index * 50}ms` }}>
+              <MotionList as="ul" className="space-y-3" animateOnMount>
+                {protocols.map((item) => (
+                  <MotionItem key={item.type} itemKey={item.type} className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2 text-xs">
                       <span className="flex items-center gap-2">
                         <ProtocolBadge type={item.type} />
@@ -346,14 +342,14 @@ export function DashboardPanel({
                         style={{ width: protocolWidth(item, totalNodes) }}
                       />
                     </div>
-                  </li>
+                  </MotionItem>
                 ))}
-              </ul>
+              </MotionList>
             )}
           </CardContent>
         </Card>
 
-        <Card className="animate-rise stagger-3">
+        <Card className="animate-rise">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -371,12 +367,18 @@ export function DashboardPanel({
             {sourceStats.length === 0 ? (
               <p className="py-6 text-center text-sm text-fg-45">还没有源。</p>
             ) : (
-              <ul className="space-y-2">
-                {(showAllSources ? sourceStats : sourceStats.slice(0, 6)).map((item, index) => {
+              <MotionList
+                as="ul"
+                className="space-y-2"
+                animateOnMount
+                /* 展开/收起时行高变化，用 sync 保留离场占位，避免行在滑动中抖动 */
+                mode="sync"
+              >
+                {visibleSourceStats.map((item) => {
                   const expanded = expandedSourceId === item.sourceId;
                   const panelId = `source-nodes-${item.sourceId}`;
                   return (
-                    <li key={item.sourceId} className="animate-fade-in-up" style={{ animationDelay: `${index * 40}ms` }}>
+                    <MotionItem key={item.sourceId} itemKey={item.sourceId}>
                       <button
                         type="button"
                         onClick={() => toggleSourceNodes(item.sourceId)}
@@ -425,11 +427,8 @@ export function DashboardPanel({
                           )}
                         />
                       </button>
-                      {expanded ? (
-                        <div
-                          id={panelId}
-                          className="animate-fade-in-up mt-2 rounded-xl border border-ink/10 bg-ink/5 p-3"
-                        >
+                      <MotionReveal open={expanded} id={panelId}>
+                        <div className="mt-2 rounded-xl border border-ink/10 bg-ink/5 p-3">
                           <SourceNodesInline
                             state={sourceNodes[item.sourceId] ?? { status: "loading" }}
                             onRetry={() => void loadSourceNodes(item.sourceId)}
@@ -441,18 +440,19 @@ export function DashboardPanel({
                             }
                           />
                         </div>
-                      ) : null}
-                    </li>
+                      </MotionReveal>
+                    </MotionItem>
                   );
                 })}
-              </ul>
+              </MotionList>
             )}
-            {sourceStats.length > 6 ? (
+            {sourceStats.length > MAX_COLLAPSED_SOURCES ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="mt-2 w-full"
+                aria-expanded={showAllSources}
                 onClick={() => setShowAllSources((current) => !current)}
               >
                 {showAllSources ? "收起" : `展开全部 ${sourceStats.length} 个源`}
@@ -467,7 +467,7 @@ export function DashboardPanel({
       </div>
 
       {warnings.length > 0 ? (
-        <Card className="animate-rise stagger-4 border-amber-500/30">
+        <Card className="animate-rise border-amber-500/30">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2 text-base">
               <TriangleAlert aria-hidden="true" className="h-4 w-4 text-amber-400" />
@@ -476,28 +476,28 @@ export function DashboardPanel({
             <Badge variant="warning">{warnings.length}</Badge>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
+            <MotionList as="ul" className="space-y-2" animateOnMount>
               {warnings.map((item, index) => (
-                <li
+                <MotionItem
                   key={`${item.level}-${index}`}
+                  itemKey={`${item.level}-${index}`}
                   className={cn(
-                    "animate-fade-in-up flex items-start gap-2 rounded-xl border px-3 py-2 text-xs",
+                    "flex items-start gap-2 rounded-xl border px-3 py-2 text-xs",
                     item.level === "error"
                       ? "border-red-500/30 bg-red-500/10 text-red-200"
                       : "border-amber-500/30 bg-amber-500/10 text-amber-200"
                   )}
-                  style={{ animationDelay: `${index * 40}ms` }}
                 >
                   <CircleAlert aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span className="break-words">{item.message}</span>
-                </li>
+                </MotionItem>
               ))}
-            </ul>
+            </MotionList>
           </CardContent>
         </Card>
       ) : null}
 
-      <Card className="animate-rise stagger-4">
+      <Card className="animate-rise">
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2 text-base">
             <Activity aria-hidden="true" className="h-4 w-4 text-primary-300" />

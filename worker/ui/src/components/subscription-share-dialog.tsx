@@ -2,6 +2,7 @@ import * as React from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Check, Copy, Download, ExternalLink, QrCode, ShieldAlert } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
+import { LoadingButton } from "@subboost/ui/motion/loading-button";
 import {
   Dialog,
   DialogContent,
@@ -76,10 +77,16 @@ export function SubscriptionShareContent({
       </p>
 
       <DialogFooter className="gap-2 sm:flex-row">
-        <Button type="button" variant="secondary" onClick={onDownload} disabled={downloading}>
+        <LoadingButton
+          type="button"
+          variant="secondary"
+          onClick={onDownload}
+          loading={downloading}
+          loadingLabel="保存中…"
+        >
           <Download aria-hidden="true" />
-          {downloading ? "保存中…" : "保存二维码"}
-        </Button>
+          保存二维码
+        </LoadingButton>
         <Button type="button" variant="secondary" onClick={onOpenLink}>
           <ExternalLink aria-hidden="true" />
           打开链接

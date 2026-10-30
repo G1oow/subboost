@@ -48,7 +48,7 @@ const DialogContent = React.forwardRef<
           // 再叠 glass-card 的 backdrop-blur-xl 只会在每帧对整块背景做 24px 模糊，
           // 既看不出效果又拖慢开合动画。这里直接给不透明底色 + 边框阴影。
           "pointer-events-auto relative grid w-full max-w-lg gap-4 rounded-2xl border border-ink/10 bg-surface p-6 shadow-(--popover-shadow) max-h-[85vh] overflow-y-auto custom-scrollbar",
-          "data-[state=open]:animate-dialog-in data-[state=closed]:animate-dialog-out",
+          "data-[state=open]:animate-modal-in data-[state=closed]:animate-modal-out",
           className
         )}
         {...props}

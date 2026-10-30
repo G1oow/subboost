@@ -14,7 +14,7 @@ import { TokenGate } from "./token-gate";
 import type { AppState, DashboardStats, SourceNodesResponse } from "../lib/types";
 
 const STATE: AppState = {
-  app: { name: "SubBoost Lite", version: "0.2.0" },
+  app: { name: "SubBoost Lite", version: "0.3.8" },
   sources: [
     {
       id: "s1",
@@ -84,11 +84,37 @@ describe("admin UI rendering", () => {
       )
     );
     expect(html).toContain("SubBoost Lite");
-    expect(html).toContain("v0.2.0");
+    expect(html).toContain("v0.3.8");
     expect(html).toContain("content");
   });
 
-  it("renders the status panel with source and subscription results", () => {
+  it("renders the nav as a segmented tablist with the active page selected", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(
+        AppShell,
+        {
+          title: STATE.app.name,
+          version: STATE.app.version,
+          onLogout: () => {},
+          navItems: [
+            { id: "dashboard", label: "仪表板" },
+            { id: "sources", label: "源管理", badge: 2 },
+          ],
+          activeNav: "sources",
+          onNavigate: () => {},
+        },
+        React.createElement("p", null, "content")
+      )
+    );
+    // 导航是 tablist + tab，滑块靠 layoutId 跟随，不再手写定位
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('aria-label="主导航"');
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain("源管理");
+  });
+
+  it("renders the status panel as a health board with a one-line verdict", () => {
     const html = renderToStaticMarkup(
       React.createElement(StatusPanel, { state: STATE, onRefresh: noopAsync, refreshing: false })
     );
@@ -96,6 +122,32 @@ describe("admin UI rendering", () => {
     expect(html).toContain("机场 A");
     expect(html).toContain("默认订阅");
     expect(html).toContain("12");
+    // 结论条是看板的核心：全部成功要一眼看得出来
+    expect(html).toContain("全部成功");
+    expect(html).toContain("节点总数");
+    // 占比按源节点算，单个源即 100%
+    expect(html).toContain("100%");
+  });
+
+  it("surfaces a failing source inline instead of hiding it in a column", () => {
+    const failing = {
+      ...STATE,
+      status: {
+        ...STATE.status!,
+        sources: [
+          { sourceId: "s1", ok: false, error: "上游返回 502" },
+          { sourceId: "s2", ok: true, nodeCount: 4 },
+        ],
+      },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(StatusPanel, { state: failing, onRefresh: noopAsync, refreshing: false })
+    );
+    expect(html).toContain("部分失败");
+    expect(html).toContain("上游返回 502");
+    expect(html).toContain("手动节点");
+    // 条形宽度必须与显示的百分比同源，不能用组内归一（否则 40% 会画满）
+    expect(html).not.toContain("width:80%");
   });
 
   it("renders the sources panel with both source kinds", () => {

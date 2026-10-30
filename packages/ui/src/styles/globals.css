@@ -13,8 +13,12 @@
      仪表板一次渲染就能堆出 40+ 层，叠加毛玻璃后掉帧。 */
   --animate-page-in: pageIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   --animate-rise: rise 0.44s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  --animate-pop-in: popIn 0.34s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+  --animate-pop-in: popIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   --animate-fade-in-up: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  /* 滚动容器内专用：从上方落入。
+     向下偏移（translate 0 8px）会被计进容器的 scrollHeight，
+     动画期间就冒出一条滚动条；向上偏移不计入，所以永不撑出滚动条。 */
+  --animate-settle-in: settleIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-bar-grow: barGrow 0.85s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   --animate-float: float 7s ease-in-out infinite;
@@ -23,15 +27,17 @@
   /* 覆盖层 / 弹窗 / Toast 进出场，配合 Radix Presence 的 animationend 卸载 */
   --animate-overlay-in: overlayIn 0.18s ease-out;
   --animate-overlay-out: overlayOut 0.15s ease-in;
-  --animate-dialog-in: dialogIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-dialog-out: dialogOut 0.16s cubic-bezier(0.4, 0, 1, 1);
+  /* 弹窗（Radix Dialog）进出场：纯 CSS 驱动，靠 data-[state=open/closed] 触发。
+     命名与关键帧对齐规格里的 modalIn / modalOut。 */
+  --animate-modal-in: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-modal-out: modalOut 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   /* 下拉/弹出菜单：比弹窗更快、回弹更明显，贴合触发器一侧展开 */
   --animate-menu-in: menuIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-menu-out: menuOut 0.12s cubic-bezier(0.4, 0, 1, 1);
   --animate-toast-in: toastIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-toast-out: toastOut 0.16s ease-in;
   /* 状态图标切换时的轻量弹入，用在勾选/复制成功这类瞬时反馈 */
-  --animate-icon-pop: iconPop 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+  --animate-icon-pop: iconPop 0.26s cubic-bezier(0.22, 1, 0.36, 1);
   /* Toast 底部进度条：随停留时间从满到空，悬停时暂停 */
   --animate-toast-progress: toastProgress 15s linear forwards;
 }
@@ -453,6 +459,19 @@
   }
 }
 
+/* 滚动容器内的列表项入场：从上方落入。
+   向下偏移会被滚动容器计入 scrollHeight，动画期间凭空冒出一条滚动条。
+   向上偏移只影响上方的溢出，不计入可滚动区域，所以永远撑不出滚动条。 */
+@keyframes settleIn {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
 @keyframes shimmer {
   from {
     background-position: -160% 0;
@@ -507,13 +526,14 @@
 }
 
 /* 弹窗：从略小 + 略靠下处浮现，带 4px 上移，方向感比纯缩放更明确。
-   只动 scale/translate，不写 transform，避免覆盖 translate-x-[-50%] 的居中定位。 */
-@keyframes dialogIn {
+   只动 scale/translate，不写 transform：transform 会覆盖元素自身的 translate-* 定位，
+   而且 scale() 会触发逐帧重新栅格化，动画期间文字发虚。 */
+@keyframes modalIn {
   from { opacity: 0; scale: 0.96; translate: 0 6px; }
   to { opacity: 1; scale: 1; translate: 0 0; }
 }
 
-@keyframes dialogOut {
+@keyframes modalOut {
   from { opacity: 1; scale: 1; translate: 0 0; }
   to { opacity: 0; scale: 0.98; translate: 0 4px; }
 }

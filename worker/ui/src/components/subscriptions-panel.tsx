@@ -16,6 +16,7 @@ import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@subboost/ui/components/ui/table";
 import { useToast } from "@subboost/ui/components/ui/toaster";
+import { MotionItem, MotionList } from "@subboost/ui/motion/motion-list";
 import { copyTextToClipboard } from "@subboost/ui/lib/clipboard";
 import { cn } from "@subboost/ui/lib/utils";
 import type { AppState, SubscriptionDto } from "../lib/types";
@@ -213,57 +214,67 @@ export function SubscriptionsPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {state.subscriptions.map((subscription, index) => (
-                <TableRow
-                  key={subscription.id}
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
-                >
-                  <TableCell className="font-medium text-fg">{subscription.name}</TableCell>
-                  <TableCell>{renderBoundSources(subscription)}</TableCell>
-                  <TableCell className="max-w-[280px] truncate font-mono text-xs text-fg-50">
-                    {subscription.link}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <IconButton
-                        label={`分享 ${subscription.name} 二维码`}
-                        variant="ghost"
-                        onClick={() => setSharingId(subscription.id)}
-                      >
-                        <QrCode aria-hidden="true" />
-                      </IconButton>
-                      <IconButton label={`复制 ${subscription.name} 链接`} variant="ghost" onClick={() => handleCopy(subscription)}>
-                        <Check
-                          aria-hidden="true"
-                          className={cn(
-                            copiedId === subscription.id ? "animate-icon-pop text-emerald-400" : "hidden"
-                          )}
-                        />
-                        <Copy
-                          aria-hidden="true"
-                          className={cn(copiedId === subscription.id ? "hidden" : undefined)}
-                        />
-                      </IconButton>
-                      {onUpdate ? (
+              <MotionList as="div" className="contents table-row-group">
+                {state.subscriptions.map((subscription) => (
+                  <MotionItem as="tr" key={subscription.id} itemKey={subscription.id}>
+                    <TableCell className="font-medium text-fg">{subscription.name}</TableCell>
+                    <TableCell>{renderBoundSources(subscription)}</TableCell>
+                    <TableCell className="max-w-[280px] truncate font-mono text-xs text-fg-50">
+                      {subscription.link}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
                         <IconButton
-                          label={`修改 ${subscription.name} 的源`}
+                          label={`分享 ${subscription.name} 二维码`}
                           variant="ghost"
-                          onClick={() => openEdit(subscription)}
+                          onClick={() => setSharingId(subscription.id)}
                         >
-                          <Pencil aria-hidden="true" />
+                          <QrCode aria-hidden="true" />
                         </IconButton>
-                      ) : null}
-                      <IconButton label={`轮换 ${subscription.name} token`} variant="ghost" onClick={() => handleRotate(subscription)}>
-                        <RefreshCw aria-hidden="true" />
-                      </IconButton>
-                      <IconButton label={`删除 ${subscription.name}`} variant="ghost" onClick={() => handleDelete(subscription)}>
-                        <Trash2 aria-hidden="true" />
-                      </IconButton>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        <IconButton
+                          label={`复制 ${subscription.name} 链接`}
+                          variant="ghost"
+                          onClick={() => handleCopy(subscription)}
+                        >
+                          <Check
+                            aria-hidden="true"
+                            className={cn(
+                              copiedId === subscription.id ? "animate-icon-pop text-emerald-400" : "hidden"
+                            )}
+                          />
+                          <Copy
+                            aria-hidden="true"
+                            className={cn(copiedId === subscription.id ? "hidden" : undefined)}
+                          />
+                        </IconButton>
+                        {onUpdate ? (
+                          <IconButton
+                            label={`修改 ${subscription.name} 的源`}
+                            variant="ghost"
+                            onClick={() => openEdit(subscription)}
+                          >
+                            <Pencil aria-hidden="true" />
+                          </IconButton>
+                        ) : null}
+                        <IconButton
+                          label={`轮换 ${subscription.name} token`}
+                          variant="ghost"
+                          onClick={() => handleRotate(subscription)}
+                        >
+                          <RefreshCw aria-hidden="true" />
+                        </IconButton>
+                        <IconButton
+                          label={`删除 ${subscription.name}`}
+                          variant="ghost"
+                          onClick={() => handleDelete(subscription)}
+                        >
+                          <Trash2 aria-hidden="true" />
+                        </IconButton>
+                      </div>
+                    </TableCell>
+                  </MotionItem>
+                ))}
+              </MotionList>
             </TableBody>
           </Table>
         )}
@@ -290,43 +301,44 @@ export function SubscriptionsPanel({
               <p className="text-xs text-fg-45">
                 不选择任何源表示使用全部启用源；勾选后只聚合这些源。
               </p>
-              <div className="grid gap-2">
-                {state.sources.map((source, index) => {
+              {/* 勾选/取消只是改变高亮，不需要进离场动画；FLIP 负责重排 */}
+              <MotionList as="div" className="grid gap-2" mode="sync">
+                {state.sources.map((source) => {
                   const checked = selected.includes(source.id);
                   return (
-                    <button
-                      key={source.id}
-                      type="button"
-                      onClick={() => toggleSource(source.id)}
-                      aria-pressed={checked}
-                      className={cn(
-                        "animate-fade-in-up flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-all duration-200",
-                        checked
-                          ? "border-primary-500/50 bg-primary-500/20 text-fg"
-                          : "border-ink/10 bg-ink/5 text-fg-70 hover:-translate-y-px hover:bg-ink/10"
-                      )}
-                      style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "flex h-4 w-4 items-center justify-center rounded border transition-colors",
-                            checked ? "border-primary-500 bg-primary-500/70" : "border-ink/25"
-                          )}
-                        >
-                          {checked ? <Check className="h-3 w-3 text-fg" /> : null}
+                    <MotionItem as="div" key={source.id} itemKey={source.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSource(source.id)}
+                        aria-pressed={checked}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-all duration-200",
+                          checked
+                            ? "border-primary-500/50 bg-primary-500/20 text-fg"
+                            : "border-ink/10 bg-ink/5 text-fg-70 hover:-translate-y-px hover:bg-ink/10"
+                        )}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "flex h-4 w-4 items-center justify-center rounded border transition-colors",
+                              checked ? "border-primary-500 bg-primary-500/70" : "border-ink/25"
+                            )}
+                          >
+                            {checked ? <Check className="h-3 w-3 text-fg" /> : null}
+                          </span>
+                          {source.name}
                         </span>
-                        {source.name}
-                      </span>
-                      <span className="text-xs text-fg-45">
-                        {source.kind === "remote" ? "远程" : "手动"}
-                        {source.enabled ? "" : " · 已停用"}
-                      </span>
-                    </button>
+                        <span className="text-xs text-fg-45">
+                          {source.kind === "remote" ? "远程" : "手动"}
+                          {source.enabled ? "" : " · 已停用"}
+                        </span>
+                      </button>
+                    </MotionItem>
                   );
                 })}
-              </div>
+              </MotionList>
             </div>
 
             {error ? (
