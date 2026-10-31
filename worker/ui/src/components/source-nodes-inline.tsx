@@ -100,24 +100,25 @@ export function SourceNodesInline({
             <li
               key={node.key}
               className={cn(
-                "animate-fade-in-up flex items-center gap-2 rounded-lg border px-2.5 py-1.5",
+                "animate-settle-in flex items-center gap-2 rounded-lg border px-2.5 py-1.5",
                 node.renamed ? "border-primary-500/30 bg-primary-500/10" : "border-ink/10 bg-ink/5"
               )}
               style={{ animationDelay: `${Math.min(index, 8) * 25}ms` }}
             >
               <ProtocolBadge type={node.type} className="shrink-0" />
               <div className="min-w-0 flex-1">
+                {/* 原名是背景信息，放在上方作为说明；节点名是要认的那一行，放在下方 */}
+                <p className="truncate text-[11px] text-fg-40">
+                  {node.renamed ? `原名 ${node.originName || "—"}` : node.originName || "—"}
+                  {node.server ? ` · ${node.server}${node.port ? `:${node.port}` : ""}` : ""}
+                </p>
                 <p
                   className={cn(
-                    "truncate text-xs",
+                    "mt-0.5 truncate text-xs",
                     node.renamed ? "text-primary-200" : "text-fg-80"
                   )}
                 >
                   {node.name || "未命名节点"}
-                </p>
-                <p className="truncate text-[11px] text-fg-40">
-                  {node.renamed ? `原名 ${node.originName || "—"}` : node.originName || "—"}
-                  {node.server ? ` · ${node.server}${node.port ? `:${node.port}` : ""}` : ""}
                 </p>
               </div>
             </li>

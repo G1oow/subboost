@@ -18,8 +18,8 @@ const keyframeNames = new Set([...globalsCss.matchAll(KEYFRAME_BLOCKS)].map((mat
 const OVERLAY_MOTION = {
   "overlay-in": "overlayIn",
   "overlay-out": "overlayOut",
-  "dialog-in": "dialogIn",
-  "dialog-out": "dialogOut",
+  "modal-in": "modalIn",
+  "modal-out": "modalOut",
   "menu-in": "menuIn",
   "menu-out": "menuOut",
   "toast-in": "toastIn",
@@ -29,7 +29,7 @@ const OVERLAY_MOTION = {
 } as const;
 
 /** 这些关键帧绝不能再动 transform：会覆盖元素自身的 translate-* 定位 */
-const NO_TRANSFORM_KEYFRAMES = ["pageIn", "dialogIn", "dialogOut", "menuIn", "menuOut", "popIn"];
+const NO_TRANSFORM_KEYFRAMES = ["pageIn", "modalIn", "modalOut", "menuIn", "menuOut", "popIn"];
 
 function keyframeBody(name: string): string {
   const start = globalsCss.indexOf(`@keyframes ${name}`);
@@ -71,7 +71,7 @@ describe("motion tokens", () => {
     for (const token of Object.keys(OVERLAY_MOTION)) {
       expect(tokenKeyframes.has(token)).toBe(true);
     }
-    expect(tokenKeyframes.get("dialog-out")).toBe("dialogOut");
+    expect(tokenKeyframes.get("modal-out")).toBe("modalOut");
     expect(tokenKeyframes.get("menu-out")).toBe("menuOut");
     expect(tokenKeyframes.get("toast-out")).toBe("toastOut");
   });
@@ -95,6 +95,42 @@ describe("text rasterization", () => {
   });
 });
 
+describe("no overshoot", () => {
+  /**
+   * 带过冲的缓动（cubic-bezier 的 y 值 > 1）会让元素越过目标值再弹回来，
+   * 观感就是"动画结束后被强制归位"。进场类动效一律用 y ≤ 1 的曲线，
+   * 保证最后一帧精确落在终值上。
+   */
+  it("keeps entering animation easings from overshooting", () => {
+    const tokens = [...globalsCss.matchAll(/--animate-([\w-]+):\s*[\w-]+\s+[\d.]+m?s\s+cubic-bezier\(([^)]+)\)/gu)];
+    expect(tokens.length).toBeGreaterThan(0);
+    for (const [, token, values] of tokens) {
+      const points = values.split(",").map((value) => Number.parseFloat(value.trim()));
+      // cubic-bezier(x1, y1, x2, y2)：y1 / y2 决定是否越过终值
+      const [, y1, , y2] = points;
+      expect(y1, `--animate-${token} 的 y1 不得 > 1（会过冲）`).toBeLessThanOrEqual(1);
+      expect(y2, `--animate-${token} 的 y2 不得 > 1（会过冲）`).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe("scroll container overflow", () => {
+  /**
+   * 向下偏移会被滚动容器计入 scrollHeight：动画期间容器凭空多出一条滚动条。
+   * 向上偏移只影响上方溢出，不计入可滚动区域，所以滚动容器内的入场必须向上。
+   */
+  it("keeps the in-scroller entrance moving upward", () => {
+    const body = keyframeBody("settleIn");
+    expect(body, "@keyframes settleIn 未找到").not.toBe("");
+    // from 必须向上（负值），且不能出现向下的正位移
+    expect(body).toMatch(/from\s*\{[^}]*translate:\s*0\s*-[\d.]+px/u);
+    expect(body).not.toMatch(/translate:\s*0\s+[\d.]+px\s*;/u);
+  });
+
+  it("points the settle-in token at that keyframes", () => {
+    expect(tokenKeyframes.get("settle-in")).toBe("settleIn");
+  });
+});
 describe("positioning vs. animation property conflicts", () => {
   /**
    * Tailwind v4 的 translate-x/y-* 写的是独立的 translate 属性，
@@ -110,7 +146,7 @@ describe("positioning vs. animation property conflicts", () => {
     // 居中改由 grid 容器承担，内容元素上不应再有 translate-x/y 工具类
     expect(dialogSource).not.toMatch(/translate-[xy]-\[?-?[0-9]/u);
     // 但动画本身仍然要用 translate 做微位移
-    expect(keyframeBody("dialogIn")).toMatch(/translate\s*:/u);
+    expect(keyframeBody("modalIn")).toMatch(/translate\s*:/u);
   });
 
   it("keeps select offsets on margin so menu keyframes own translate", () => {

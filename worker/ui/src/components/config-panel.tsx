@@ -4,6 +4,7 @@ import { Button } from "@subboost/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@subboost/ui/components/ui/card";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
 import { useToast } from "@subboost/ui/components/ui/toaster";
+import { LoadingButton } from "@subboost/ui/motion/loading-button";
 import type { AppState } from "../lib/types";
 
 export type ConfigPanelProps = {
@@ -76,10 +77,10 @@ export function ConfigPanel({ state, onSave, onReset }: ConfigPanelProps) {
             <RotateCcw aria-hidden="true" />
             恢复默认
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <LoadingButton onClick={handleSave} loading={saving} loadingLabel="保存中…">
             <Save aria-hidden="true" />
             保存
-          </Button>
+          </LoadingButton>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

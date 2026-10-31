@@ -14,9 +14,10 @@ import {
 import { FormField } from "@subboost/ui/components/ui/form-field";
 import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
+import { LoadingButton } from "@subboost/ui/motion/loading-button";
+import { MotionItem, MotionList } from "@subboost/ui/motion/motion-list";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@subboost/ui/components/ui/select";
 import { SwitchField } from "@subboost/ui/components/ui/switch-field";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@subboost/ui/components/ui/table";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
 import { useToast } from "@subboost/ui/components/ui/toaster";
 import { NodeRenameEditor } from "./node-rename-editor";
@@ -307,70 +308,55 @@ export function SourcesPanel({ state, onSave, onParseNodes, onLoadNodes }: Sourc
             <p className="text-sm text-fg-50">还没有源，先添加一个上游订阅或手动节点。</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>名称</TableHead>
-                <TableHead>类型</TableHead>
-                <TableHead>启用</TableHead>
-                <TableHead>最近节点数</TableHead>
-                <TableHead className="text-right">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {state.sources.map((source, index) => {
-                const status = statusBySource.get(source.id);
-                const renamed = Object.keys(source.nodeRenames ?? {}).length;
-                return (
-                  <TableRow
-                    key={source.id}
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
-                  >
-                    <TableCell className="font-medium text-fg">
-                      <div className="flex flex-col gap-0.5">
-                        <span>{source.name}</span>
-                        {renamed > 0 ? (
-                          <span className="text-[11px] text-fg-40">已改名 {renamed} 个节点</span>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{source.kind === "remote" ? "远程" : "手动"}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={source.enabled ? "success" : "outline"}>
-                        {source.enabled ? "启用" : "停用"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="tabular-nums">{status?.nodeCount ?? "-"}</span>
+          /*
+           * 每行是一张独立卡片，而不是表格行。
+           * 表格的 <tr> 无法做出卡片轮廓与行间距，列宽还由表格算法强制对齐，
+           * 源数量多时操作区被拉得很开、视线难以横向读完。改成卡片列表后
+           * 每行自带边框与圆角，行间用 space-y 分隔，边界清楚。
+           */
+          <MotionList as="ul" className="space-y-2.5" animateOnMount>
+            {state.sources.map((source) => {
+              const status = statusBySource.get(source.id);
+              const renamed = Object.keys(source.nodeRenames ?? {}).length;
+              return (
+                <MotionItem as="li" key={source.id} itemKey={source.id}>
+                  <div className="flex items-center gap-3 rounded-xl border border-card-border bg-surface px-4 py-3 transition-[border-color,box-shadow] duration-200 hover:border-card-border-hover hover:shadow-(--card-shadow-hover)">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-medium text-fg">{source.name}</span>
+                        <Badge variant="secondary">
+                          {source.kind === "remote" ? "远程" : "手动"}
+                        </Badge>
+                        <Badge variant={source.enabled ? "success" : "outline"}>
+                          {source.enabled ? "启用" : "停用"}
+                        </Badge>
                         {status?.ok === false ? <Badge variant="destructive">失败</Badge> : null}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <IconButton
-                          label={`查看 ${source.name} 的节点`}
-                          variant="ghost"
-                          onClick={() => void openNodes(source)}
-                        >
-                          <Network aria-hidden="true" />
-                        </IconButton>
-                        <IconButton label={`编辑 ${source.name}`} variant="ghost" onClick={() => openEdit(source)}>
-                          <Pencil aria-hidden="true" />
-                        </IconButton>
-                        <IconButton label={`删除 ${source.name}`} variant="ghost" onClick={() => handleDelete(source)}>
-                          <Trash2 aria-hidden="true" />
-                        </IconButton>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      <p className="flex flex-wrap items-center gap-x-2 text-[11px] text-fg-45">
+                        <span className="tabular-nums">{status?.nodeCount ?? "-"} 个节点</span>
+                        {renamed > 0 ? <span>· 已改名 {renamed} 个</span> : null}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <IconButton
+                        label={`查看 ${source.name} 的节点`}
+                        variant="ghost"
+                        onClick={() => void openNodes(source)}
+                      >
+                        <Network aria-hidden="true" />
+                      </IconButton>
+                      <IconButton label={`编辑 ${source.name}`} variant="ghost" onClick={() => openEdit(source)}>
+                        <Pencil aria-hidden="true" />
+                      </IconButton>
+                      <IconButton label={`删除 ${source.name}`} variant="ghost" onClick={() => handleDelete(source)}>
+                        <Trash2 aria-hidden="true" />
+                      </IconButton>
+                    </div>
+                  </div>
+                </MotionItem>
+              );
+            })}
+          </MotionList>
         )}
       </CardContent>
 
@@ -477,9 +463,9 @@ export function SourcesPanel({ state, onSave, onParseNodes, onLoadNodes }: Sourc
               <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                 取消
               </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? "保存中…" : "保存"}
-              </Button>
+              <LoadingButton type="submit" loading={saving} loadingLabel="保存中…">
+                保存
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -519,9 +505,15 @@ export function SourcesPanel({ state, onSave, onParseNodes, onLoadNodes }: Sourc
                 <Button type="button" variant="secondary" onClick={() => setNodesDialog(null)}>
                   取消
                 </Button>
-                <Button type="button" onClick={() => void saveNodeRenames()} disabled={saving || nodesDialog.loading}>
-                  {saving ? "保存中…" : "保存名称"}
-                </Button>
+                <LoadingButton
+                  type="button"
+                  onClick={() => void saveNodeRenames()}
+                  disabled={nodesDialog.loading}
+                  loading={saving}
+                  loadingLabel="保存中…"
+                >
+                  保存名称
+                </LoadingButton>
               </DialogFooter>
             </div>
           ) : null}

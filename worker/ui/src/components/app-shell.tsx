@@ -3,6 +3,8 @@ import { LogOut, Moon, RefreshCw, Sun } from "lucide-react";
 import { BrandMark } from "@subboost/ui/components/ui/brand-mark";
 import { Button } from "@subboost/ui/components/ui/button";
 import { IconButton } from "@subboost/ui/components/ui/icon-button";
+import { LoadingButton } from "@subboost/ui/motion/loading-button";
+import { SegmentedControl } from "@subboost/ui/motion/segmented-control";
 import { cn } from "@subboost/ui/lib/utils";
 import { applyTheme, getCurrentTheme, persistTheme, type ThemeName } from "@subboost/ui/theme/theme";
 
@@ -26,6 +28,9 @@ export type AppShellProps = {
   refreshing?: boolean;
 };
 
+/** 导航滑块共享布局的命名空间，全局唯一即可 */
+const NAV_PILL_GROUP = "app-nav";
+
 export function AppShell({
   title,
   version,
@@ -46,6 +51,17 @@ export function AppShell({
     persistTheme(next);
   };
 
+  const navOptions = React.useMemo(
+    () =>
+      (navItems ?? []).map((item) => ({
+        id: item.id,
+        label: item.label,
+        ...(item.icon ? { icon: item.icon } : {}),
+        ...(typeof item.badge === "number" && item.badge > 0 ? { badge: item.badge } : {}),
+      })),
+    [navItems]
+  );
+
   return (
     <div className="min-h-screen bg-page text-fg">
       <header className="sticky top-0 z-30 border-b border-ink/10 bg-header backdrop-blur">
@@ -61,10 +77,16 @@ export function AppShell({
           </div>
           <div className="flex items-center gap-2">
             {onRefresh ? (
-              <Button variant="secondary" size="sm" onClick={onRefresh} disabled={refreshing}>
-                <RefreshCw className={refreshing ? "animate-spin" : undefined} aria-hidden="true" />
-                {refreshing ? "刷新中…" : "刷新"}
-              </Button>
+              <LoadingButton
+                variant="secondary"
+                size="sm"
+                onClick={onRefresh}
+                loading={refreshing}
+                loadingLabel="刷新中…"
+              >
+                <RefreshCw aria-hidden="true" />
+                刷新
+              </LoadingButton>
             ) : null}
             <IconButton
               label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
@@ -80,62 +102,24 @@ export function AppShell({
           </div>
         </div>
 
-        {navItems && navItems.length > 0 ? (
-          <nav
-            aria-label="主导航"
-            className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-3 pb-2 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {navItems.map((item) => {
-              const active = item.id === activeNav;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => onNavigate?.(item.id)}
-                  className={cn(
-                    "group relative flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all duration-300",
-                    active
-                      ? "bg-primary-500/15 text-fg shadow-(--btn-outline-shadow)"
-                      : "text-fg-55 hover:-translate-y-px hover:bg-ink/5 hover:text-fg-80"
-                  )}
-                >
-                  {item.icon ? (
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "flex h-4 w-4 items-center justify-center transition-transform duration-300",
-                        active ? "scale-110" : "group-hover:scale-110"
-                      )}
-                    >
-                      {item.icon}
-                    </span>
-                  ) : null}
-                  <span className="whitespace-nowrap">{item.label}</span>
-                  {typeof item.badge === "number" && item.badge > 0 ? (
-                    <span
-                      key={item.badge}
-                      className="animate-icon-pop rounded-full bg-ink/10 px-1.5 text-[10px] leading-4 text-fg-60"
-                    >
-                      {item.badge}
-                    </span>
-                  ) : null}
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "pointer-events-none absolute inset-x-3 bottom-0 h-0.5 origin-center rounded-full bg-primary-500 transition-all duration-300",
-                      active ? "scale-x-100 opacity-100" : "scale-x-0 opacity-0"
-                    )}
-                  />
-                </button>
-              );
-            })}
-          </nav>
+        {navOptions.length > 0 ? (
+          <div className="mx-auto max-w-6xl px-4 pb-2 sm:px-6">
+            <SegmentedControl
+              label="主导航"
+              layoutGroupId={NAV_PILL_GROUP}
+              options={navOptions}
+              activeId={activeNav ?? navOptions[0]?.id ?? ""}
+              onSelect={(id) => onNavigate?.(id)}
+              className="w-full sm:w-auto"
+              optionClassName="flex-1 justify-center px-3 py-2 sm:flex-none"
+            />
+          </div>
         ) : null}
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        <div key={activeNav ?? "page"} className="page-content animate-page-in space-y-6">
+        {/* key 换页时重新挂载，触发一次 pageIn 入场；动画只动 opacity/translate */}
+        <div key={activeNav ?? "page"} className={cn("page-content animate-page-in space-y-6")}>
           {children}
         </div>
       </main>
