@@ -14,7 +14,6 @@ import {
 import { FormField } from "@subboost/ui/components/ui/form-field";
 import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@subboost/ui/components/ui/table";
 import { useToast } from "@subboost/ui/components/ui/toaster";
 import { MotionItem, MotionList } from "@subboost/ui/motion/motion-list";
 import { copyTextToClipboard } from "@subboost/ui/lib/clipboard";
@@ -204,79 +203,77 @@ export function SubscriptionsPanel({
         ) : state.subscriptions.length === 0 ? (
           <p className="text-sm text-fg-50">还没有订阅，点击「创建订阅」生成一条链接。</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>名称</TableHead>
-                <TableHead>所含源</TableHead>
-                <TableHead>链接</TableHead>
-                <TableHead className="text-right">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <MotionList as="div" className="contents table-row-group">
-                {state.subscriptions.map((subscription) => (
-                  <MotionItem as="tr" key={subscription.id} itemKey={subscription.id}>
-                    <TableCell className="font-medium text-fg">{subscription.name}</TableCell>
-                    <TableCell>{renderBoundSources(subscription)}</TableCell>
-                    <TableCell className="max-w-[280px] truncate font-mono text-xs text-fg-50">
+          /*
+           * 与「源管理」保持一致：每条订阅是一张独立卡片，而不是表格行。
+           * 表格的列宽由算法强制对齐，链接这种长度不定的内容会把「操作」列
+           * 推得很远；卡片里链接单独占一行，能完整读到前缀，操作也贴在固定位置。
+           */
+          <MotionList as="ul" className="space-y-2.5" animateOnMount>
+            {state.subscriptions.map((subscription) => (
+              <MotionItem as="li" key={subscription.id} itemKey={subscription.id}>
+                <div className="flex items-center gap-3 rounded-xl border border-card-border bg-surface px-4 py-3 transition-[border-color,box-shadow] duration-200 hover:border-card-border-hover hover:shadow-(--card-shadow-hover)">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-medium text-fg">{subscription.name}</span>
+                      {renderBoundSources(subscription)}
+                    </div>
+                    {/* 链接单占一行：表格里被压成一列，前缀都读不全 */}
+                    <p className="truncate font-mono text-[11px] text-fg-45" title={subscription.link}>
                       {subscription.link}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <IconButton
-                          label={`分享 ${subscription.name} 二维码`}
-                          variant="ghost"
-                          onClick={() => setSharingId(subscription.id)}
-                        >
-                          <QrCode aria-hidden="true" />
-                        </IconButton>
-                        <IconButton
-                          label={`复制 ${subscription.name} 链接`}
-                          variant="ghost"
-                          onClick={() => handleCopy(subscription)}
-                        >
-                          <Check
-                            aria-hidden="true"
-                            className={cn(
-                              copiedId === subscription.id ? "animate-icon-pop text-emerald-400" : "hidden"
-                            )}
-                          />
-                          <Copy
-                            aria-hidden="true"
-                            className={cn(copiedId === subscription.id ? "hidden" : undefined)}
-                          />
-                        </IconButton>
-                        {onUpdate ? (
-                          <IconButton
-                            label={`修改 ${subscription.name} 的源`}
-                            variant="ghost"
-                            onClick={() => openEdit(subscription)}
-                          >
-                            <Pencil aria-hidden="true" />
-                          </IconButton>
-                        ) : null}
-                        <IconButton
-                          label={`轮换 ${subscription.name} token`}
-                          variant="ghost"
-                          onClick={() => handleRotate(subscription)}
-                        >
-                          <RefreshCw aria-hidden="true" />
-                        </IconButton>
-                        <IconButton
-                          label={`删除 ${subscription.name}`}
-                          variant="ghost"
-                          onClick={() => handleDelete(subscription)}
-                        >
-                          <Trash2 aria-hidden="true" />
-                        </IconButton>
-                      </div>
-                    </TableCell>
-                  </MotionItem>
-                ))}
-              </MotionList>
-            </TableBody>
-          </Table>
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <IconButton
+                      label={`分享 ${subscription.name} 二维码`}
+                      variant="ghost"
+                      onClick={() => setSharingId(subscription.id)}
+                    >
+                      <QrCode aria-hidden="true" />
+                    </IconButton>
+                    <IconButton
+                      label={`复制 ${subscription.name} 链接`}
+                      variant="ghost"
+                      onClick={() => handleCopy(subscription)}
+                    >
+                      <Check
+                        aria-hidden="true"
+                        className={cn(
+                          copiedId === subscription.id ? "animate-icon-pop text-emerald-400" : "hidden"
+                        )}
+                      />
+                      <Copy
+                        aria-hidden="true"
+                        className={cn(copiedId === subscription.id ? "hidden" : undefined)}
+                      />
+                    </IconButton>
+                    {onUpdate ? (
+                      <IconButton
+                        label={`修改 ${subscription.name} 的源`}
+                        variant="ghost"
+                        onClick={() => openEdit(subscription)}
+                      >
+                        <Pencil aria-hidden="true" />
+                      </IconButton>
+                    ) : null}
+                    <IconButton
+                      label={`轮换 ${subscription.name} token`}
+                      variant="ghost"
+                      onClick={() => handleRotate(subscription)}
+                    >
+                      <RefreshCw aria-hidden="true" />
+                    </IconButton>
+                    <IconButton
+                      label={`删除 ${subscription.name}`}
+                      variant="ghost"
+                      onClick={() => handleDelete(subscription)}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </IconButton>
+                  </div>
+                </div>
+              </MotionItem>
+            ))}
+          </MotionList>
         )}
       </CardContent>
 
