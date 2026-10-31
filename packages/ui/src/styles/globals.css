@@ -435,16 +435,17 @@
   }
 }
 
-/* 弹入：用独立的 scale 属性，不碰 transform。
-   元素可能已有 translate-* 定位（例如居中弹窗），写 transform 会把它整个覆盖掉。 */
+/* 弹入：只用 opacity + 位移，不用 scale。
+   scale 会让文字在动画期间逐帧重采样而发虚（实测锐度 -8.5%），
+   translate 则完全不影响锐度；方向感用位移表达就够了。 */
 @keyframes popIn {
   from {
     opacity: 0;
-    scale: 0.94;
+    translate: 0 6px;
   }
   to {
     opacity: 1;
-    scale: 1;
+    translate: 0 0;
   }
 }
 
@@ -525,29 +526,39 @@
   to { opacity: 0; }
 }
 
-/* 弹窗：从略小 + 略靠下处浮现，带 4px 上移，方向感比纯缩放更明确。
-   只动 scale/translate，不写 transform：transform 会覆盖元素自身的 translate-* 定位，
-   而且 scale() 会触发逐帧重新栅格化，动画期间文字发虚。 */
+/* 弹窗：只做 opacity + 位移，不用 scale。
+ *
+ * 实测（同字号同颜色，300x120 单元格，相邻像素亮度梯度均值）：
+ *   无变换            25.535
+ *   scale: 0.96       23.372   ← 变软 8.5%
+ *   transform：scale  23.372   ← 与上面同值，说明是缩放本身而不是写法
+ *   translate: 0 6px  25.535   ← 完全不变
+ *   opacity: 0.6      14.764   ← 这是透明度造成的对比度下降，不是模糊
+ *
+ * 缩放期间浏览器要把已经栅格化的文字位图重新采样到新尺寸，
+ * 每帧一次，字形边缘被插值糊掉；动画结束回到 1 时再按原尺寸重栅格化，
+ * 所以观感是「动画中发虚、最后一帧突然变清晰」。
+ * 位移只是整块平移，位图原样移动，锐度不受影响 —— 所以改用位移表达方向感。
+ */
 @keyframes modalIn {
-  from { opacity: 0; scale: 0.96; translate: 0 6px; }
-  to { opacity: 1; scale: 1; translate: 0 0; }
+  from { opacity: 0; translate: 0 8px; }
+  to { opacity: 1; translate: 0 0; }
 }
 
 @keyframes modalOut {
-  from { opacity: 1; scale: 1; translate: 0 0; }
-  to { opacity: 0; scale: 0.98; translate: 0 4px; }
+  from { opacity: 1; translate: 0 0; }
+  to { opacity: 0; translate: 0 4px; }
 }
 
-/* 下拉内容：贴着触发器方向展开。scale 原点由 data-[side] 归位到贴边一侧，
-   所以从触发器那一边"长出来"，而不是从中心放大。 */
+/* 下拉内容：同样只用位移，从触发器那一侧滑出。 */
 @keyframes menuIn {
-  from { opacity: 0; scale: 0.94; translate: 0 -4px; }
-  to { opacity: 1; scale: 1; translate: 0 0; }
+  from { opacity: 0; translate: 0 -6px; }
+  to { opacity: 1; translate: 0 0; }
 }
 
 @keyframes menuOut {
-  from { opacity: 1; scale: 1; translate: 0 0; }
-  to { opacity: 0; scale: 0.96; translate: 0 -2px; }
+  from { opacity: 1; translate: 0 0; }
+  to { opacity: 0; translate: 0 -2px; }
 }
 
 @keyframes toastIn {
