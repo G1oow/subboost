@@ -1,6 +1,6 @@
 {
   "name": "subboost-worker-lite",
-  "version": "0.3.8",
+  "version": "0.3.11",
   "license": "AGPL-3.0-only",
   "private": true,
   "engines": {
@@ -40,6 +40,8 @@
     "worker:typecheck": "npm --workspace @subboost/worker run typecheck"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.19.19",
     "@types/react": "^19.2.16",
@@ -48,6 +50,7 @@
     "eslint": "^9.19.4",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "jsdom": "^30.1.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1",
     "vite": "^8.3.0",

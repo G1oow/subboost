@@ -31,6 +31,19 @@ const OVERLAY_MOTION = {
 /** 这些关键帧绝不能再动 transform：会覆盖元素自身的 translate-* 定位 */
 const NO_TRANSFORM_KEYFRAMES = ["pageIn", "modalIn", "modalOut", "menuIn", "menuOut", "popIn"];
 
+/** 承载文字、进场过程中不许用 scale 的关键帧（缩放会让字形逐帧重采样而发虚） */
+const SCALE_FREE_KEYFRAMES = [
+  "pageIn",
+  "modalIn",
+  "modalOut",
+  "menuIn",
+  "menuOut",
+  "popIn",
+  "rise",
+  "fadeInUp",
+  "settleIn",
+];
+
 function keyframeBody(name: string): string {
   const start = globalsCss.indexOf(`@keyframes ${name}`);
   if (start < 0) return "";
@@ -89,9 +102,22 @@ describe("text rasterization", () => {
     }
   });
 
-  it("keeps pageIn free of scale", () => {
-    // 整页缩放的代价最大：整棵子树都要按新尺寸重新栅格化
-    expect(keyframeBody("pageIn")).not.toMatch(/(^|[^-\w])scale\s*:/u);
+  it("keeps every text-bearing keyframe free of scale", () => {
+    // 实测：scale: 0.96 让文字锐度从 25.535 掉到 23.372（-8.5%），
+    // translate 则完全不变（25.535 → 25.535）。缩放期间浏览器要把已栅格化的
+    // 文字位图逐帧重采样，字形边缘被插值糊掉，回到 scale:1 才重新变清晰。
+    // 所以凡是承载文字的进场关键帧一律不许出现 scale。
+    for (const name of SCALE_FREE_KEYFRAMES) {
+      const body = keyframeBody(name);
+      expect(body, `@keyframes ${name} 未找到`).not.toBe("");
+      expect(body, `@keyframes ${name} 不得使用 scale`).not.toMatch(/(^|[^-\w])scale\s*:/u);
+    }
+  });
+
+  it("still allows scale on the tiny icon keyframe", () => {
+    // 16px 的图标没有可读文字，缩放不会造成"文字发虚"，
+    // 而弹一下的反馈需要缩放来表达。这条断言防止为了统一而误删它。
+    expect(keyframeBody("iconPop")).toMatch(/scale\s*:/u);
   });
 });
 

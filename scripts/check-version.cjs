@@ -14,11 +14,15 @@
  *
  * 需要同步的位置见 PACKAGE_FILES / TEXT_TARGETS / TEST_FILES。测试里断言了具体版本号，
  * 改版本时必须一起改，否则 npm run test:unit 会红。
+ *
+ * 结构说明：所有读写都接受 `root` 参数，CLI 入口放在 `require.main` 守卫里，
+ * 并且导出纯函数。这样测试可以指向临时目录构造各种不一致场景，
+ * 不会碰真实仓库文件；同目录的 check-repo-hygiene.cjs 用的是同一套约定。
  */
 const { readFileSync, writeFileSync } = require("node:fs");
 const { join, relative, resolve } = require("node:path");
 
-const workspaceRoot = resolve(__dirname, "..");
+const DEFAULT_ROOT = resolve(__dirname, "..");
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
 /** 必须与根 package.json 保持同一版本的文件 */
@@ -61,22 +65,22 @@ const TEST_FILES = [
   },
 ];
 
-function readJson(relPath) {
-  return JSON.parse(readFileSync(join(workspaceRoot, relPath), "utf8"));
+function readJson(root, relPath) {
+  return JSON.parse(readFileSync(join(root, relPath), "utf8"));
 }
 
-function readText(relPath) {
-  return readFileSync(join(workspaceRoot, relPath), "utf8");
+function readText(root, relPath) {
+  return readFileSync(join(root, relPath), "utf8");
 }
 
 /** 收集当前所有位置的版本，用于校验与展示差异 */
-function collectVersions() {
+function collectVersions(root) {
   const findings = [];
   for (const relPath of PACKAGE_FILES) {
-    findings.push({ file: relPath, label: "package.json", version: readJson(relPath).version });
+    findings.push({ file: relPath, label: "package.json", version: readJson(root, relPath).version });
   }
   for (const target of TEXT_TARGETS) {
-    const text = readText(target.file);
+    const text = readText(root, target.file);
     for (const match of text.matchAll(target.pattern)) {
       findings.push({ file: target.file, label: target.label, version: match[2] });
     }
@@ -84,40 +88,36 @@ function collectVersions() {
   return findings;
 }
 
-function check() {
-  const rootVersion = readJson("package.json").version;
-  const findings = collectVersions();
-  const mismatched = findings.filter((item) => item.version !== rootVersion);
+/**
+ * 校验各位置版本是否与根 package.json 一致。
+ * 返回结构化结果，打印与退出码交给调用方，便于单测断言。
+ */
+function check(root = DEFAULT_ROOT) {
+  const rootVersion = readJson(root, "package.json").version;
 
   if (!SEMVER.test(rootVersion)) {
-    console.error(`根 package.json 的 version "${rootVersion}" 不是合法 semver。`);
-    return 1;
+    return { code: 1, reason: "invalid-root-version", rootVersion, findings: [], mismatched: [] };
   }
 
-  if (mismatched.length > 0) {
-    console.error(`版本不一致，基准是 package.json 的 ${rootVersion}：`);
-    for (const item of mismatched) {
-      console.error(`  ${item.file} (${item.label}): ${item.version}`);
-    }
-    console.error("\n修复：node scripts/check-version.cjs --set <version>");
-    return 1;
-  }
-
-  console.log(`版本一致：${rootVersion}（检查了 ${findings.length} 处）。`);
-  return 0;
+  const findings = collectVersions(root);
+  const mismatched = findings.filter((item) => item.version !== rootVersion);
+  return { code: mismatched.length > 0 ? 1 : 0, reason: mismatched.length > 0 ? "mismatch" : "ok", rootVersion, findings, mismatched };
 }
 
-function setVersion(nextVersion, dryRun) {
+/**
+ * 把 nextVersion 同步写入所有位置。
+ * `dryRun` 只计算改动、不落盘，返回的结构一致，便于测试比对。
+ */
+function setVersion(nextVersion, dryRun = false, root = DEFAULT_ROOT) {
   if (!SEMVER.test(nextVersion)) {
-    console.error(`"${nextVersion}" 不是合法 semver（形如 1.2.3 或 1.2.3-beta.1）。`);
-    return 1;
+    return { code: 1, reason: "invalid-version", nextVersion, changed: [] };
   }
 
   const changed = [];
 
   // 1. 各 package.json：走 JSON 解析再写回，保证格式稳定、不会误伤字符串里的同形数字
   for (const relPath of PACKAGE_FILES) {
-    const absPath = join(workspaceRoot, relPath);
+    const absPath = join(root, relPath);
     const raw = readFileSync(absPath, "utf8");
     const parsed = JSON.parse(raw);
     if (parsed.version === nextVersion) continue;
@@ -134,7 +134,7 @@ function setVersion(nextVersion, dryRun) {
 
   // 2. 文档与测试里的字面量
   for (const target of [...TEXT_TARGETS, ...TEST_FILES]) {
-    const absPath = join(workspaceRoot, target.file);
+    const absPath = join(root, target.file);
     const raw = readFileSync(absPath, "utf8");
     let touched = false;
     // 只替换第 2 个捕获组（版本号本身），其余文本原样保留。
@@ -151,35 +151,78 @@ function setVersion(nextVersion, dryRun) {
     }
   }
 
-  if (changed.length === 0) {
-    console.log(`全部位置已经是 ${nextVersion}，无需改动。`);
-    return 0;
-  }
-
-  console.log(`${dryRun ? "[dry-run] 将" : ""}同步版本到 ${nextVersion}：`);
-  for (const item of changed) {
-    const note = item.skipped ? `（${item.skipped}）` : "";
-    console.log(`  ${relative(workspaceRoot, join(workspaceRoot, item.file))}: ${item.from} -> ${item.to}${note}`);
-  }
-  if (!dryRun) console.log("\n记得同步更新 CHANGELOG（如果存在）并重跑 npm run test:unit。");
-  return 0;
+  return { code: 0, reason: changed.length === 0 ? "already-synced" : "synced", nextVersion, changed };
 }
 
-function main() {
-  const args = process.argv.slice(2);
-  const setIndex = args.indexOf("--set");
-  const dryRun = args.includes("--dry-run");
+/** 打印并返回退出码。CLI 与测试共用这一层，保证输出文案只有一份。 */
+function report(result, { root = DEFAULT_ROOT, dryRun = false } = {}) {
+  if (result.reason === "invalid-root-version") {
+    console.error(`根 package.json 的 version "${result.rootVersion}" 不是合法 semver。`);
+    return result.code;
+  }
+
+  if (result.reason === "invalid-version") {
+    console.error(`"${result.nextVersion}" 不是合法 semver（形如 1.2.3 或 1.2.3-beta.1）。`);
+    return result.code;
+  }
+
+  if (result.reason === "mismatch") {
+    console.error(`版本不一致，基准是 package.json 的 ${result.rootVersion}：`);
+    for (const item of result.mismatched) {
+      console.error(`  ${item.file} (${item.label}): ${item.version}`);
+    }
+    console.error("\n修复：node scripts/check-version.cjs --set <version>");
+    return result.code;
+  }
+
+  if (result.reason === "ok") {
+    console.log(`版本一致：${result.rootVersion}（检查了 ${result.findings.length} 处）。`);
+    return result.code;
+  }
+
+  if (result.reason === "already-synced") {
+    console.log(`全部位置已经是 ${result.nextVersion}，无需改动。`);
+    return result.code;
+  }
+
+  console.log(`${dryRun ? "[dry-run] 将" : ""}同步版本到 ${result.nextVersion}：`);
+  for (const item of result.changed) {
+    const note = item.skipped ? `（${item.skipped}）` : "";
+    console.log(`  ${relative(root, join(root, item.file))}: ${item.from} -> ${item.to}${note}`);
+  }
+  if (!dryRun) console.log("\n记得同步更新 CHANGELOG（如果存在）并重跑 npm run test:unit。");
+  return result.code;
+}
+
+/** CLI 解析。argv 不含 node 与脚本路径。 */
+function main(argv = process.argv.slice(2), root = DEFAULT_ROOT) {
+  const setIndex = argv.indexOf("--set");
+  const dryRun = argv.includes("--dry-run");
 
   if (setIndex >= 0) {
-    const nextVersion = args[setIndex + 1];
+    const nextVersion = argv[setIndex + 1];
     if (!nextVersion) {
       console.error("用法：node scripts/check-version.cjs --set <version> [--dry-run]");
       return 1;
     }
-    return setVersion(nextVersion, dryRun);
+    return report(setVersion(nextVersion, dryRun, root), { root, dryRun });
   }
 
-  return check();
+  return report(check(root), { root });
 }
 
-process.exit(main());
+if (require.main === module) {
+  process.exit(main());
+}
+
+module.exports = {
+  PACKAGE_FILES,
+  TEXT_TARGETS,
+  TEST_FILES,
+  SEMVER,
+  collectVersions,
+  check,
+  setVersion,
+  report,
+  main,
+};

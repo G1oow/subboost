@@ -65,7 +65,9 @@ export function SegmentedControl({
             className={cn(
               "relative flex shrink-0 items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors duration-200",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
-              active ? "text-fg" : "text-fg-55 hover:text-fg-80",
+              // 选中项用配套前景令牌：深色白字、浅色是同色系深蓝，
+              // 比统一写 text-fg 更贴合蓝紫胶囊的色相
+              active ? "text-seg-active-fg" : "text-fg-55 hover:text-fg-80",
               optionClassName
             )}
           >

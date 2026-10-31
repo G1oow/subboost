@@ -14,7 +14,7 @@ import { TokenGate } from "./token-gate";
 import type { AppState, DashboardStats, SourceNodesResponse } from "../lib/types";
 
 const STATE: AppState = {
-  app: { name: "SubBoost Lite", version: "0.3.8" },
+  app: { name: "SubBoost Lite", version: "0.3.11" },
   sources: [
     {
       id: "s1",
@@ -84,7 +84,7 @@ describe("admin UI rendering", () => {
       )
     );
     expect(html).toContain("SubBoost Lite");
-    expect(html).toContain("v0.3.8");
+    expect(html).toContain("v0.3.11");
     expect(html).toContain("content");
   });
 
@@ -174,6 +174,13 @@ describe("admin UI rendering", () => {
     expect(html).toContain("默认订阅");
     expect(html).toContain("https://worker.example.com/sub/tokenvalue");
     expect(html).toContain("分享 默认订阅 二维码");
+    // 与「源管理」一致：订阅也走卡片列表，不再用表格
+    expect(html).not.toContain("<table");
+    expect(html).not.toContain("<thead");
+    expect(html).toContain("<ul");
+    expect(html).toContain("<li");
+    // 卡片轮廓：表格行做不出圆角边框与行间距
+    expect(html).toContain("border-card-border");
   });
 
   it("renders the share content with the link and security hint", () => {

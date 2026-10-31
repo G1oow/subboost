@@ -38,6 +38,49 @@ npm run worker:build         # 确认产物可构建
 只改了纯逻辑（`packages/core`）时可先跑 `npm run test:core` 快速反馈，但最终仍需全量。
 只在无头环境能验证的事情不作为已通过的结论；无法验证时必须明确说明未验证项与风险。
 
+## 每次改动后开本地预览并交回可用的访问信息（强制）
+
+改完管理端（`worker/ui`、`packages/ui`）或任何会影响页面渲染的代码后，
+**主动启动本地预览并在回复末尾给出可直接复制使用的访问信息**，不要等用户来问，
+也不要只说"已改完"就结束。
+
+必须交回的内容：
+
+- 地址：`http://127.0.0.1:8799`（端口固定 8799，不随意更换）
+- 管理端 token：从**仓库根目录**的 `.dev.vars` 读取 `ADMIN_TOKEN`（值可能带引号，
+  读取时 `.Trim('"')`）。本地值班用 `.dev.vars` 里已有的测试值即可，
+  该文件已被 gitignore，**绝不允许超出本地范围使用**。
+- 前端 localStorage 键：`subboost-worker-admin-token`（token）、`subboost-theme`（主题）
+- 本次改动对应的页面路由，例如 `#/sources`、`#/subscriptions`、`#/status`
+
+标准启动方式：
+
+```powershell
+# 先确认没有旧实例争用端口：多个 wrangler 同时监听 8799 会导致 TCP 可连但 HTTP 挂起
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -like '*wrangler*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+Get-Process workerd -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Seconds 3
+
+npx wrangler dev --port 8799 --local
+```
+
+启动后约 20–25 秒再探活，**必须返回 200 才能告诉用户可用**：
+
+```powershell
+(Invoke-WebRequest -Uri 'http://127.0.0.1:8799/api/state' -TimeoutSec 10 -SkipHttpErrorCheck `
+  -Headers @{ Authorization = 'Bearer <ADMIN_TOKEN>' }).StatusCode   # 期望 200
+```
+
+规则：
+
+- 启动是幂等的：本地预览没有自动热更新，**每次改完都要重新 `npm run worker:build`
+  再重启 wrangler**，否则用户看到的是旧产物。
+- 不要把 `wrangler dev` 的进程留着跨轮次不管；下一轮改动前先按上面的清理步骤收尾。
+- token 只能出现在本机回复里，不许写进 commit、PR 正文、README、测试或任何会公开的位置。
+- 探活失败时如实说明失败状态与原因，不要把"进程起来了"当成"可以访问"。
+
 ## 版本号规范（强制）
 
 版本号的单一来源是**根 `package.json` 的 `version`**。worker 运行时读取
